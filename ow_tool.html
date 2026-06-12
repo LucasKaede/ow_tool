@@ -366,7 +366,7 @@
                 }
             });
 
-            // ★ 味方視点：サポートの「ヒール量」評価（大=3, 中=2, 小=1） -> 合計4未満はペナルティ
+            // ★ 味方視点：サポートの「ヒール量」評価（中×小 は -2.0点、小×小 は -3.0点）
             if (hero.role === 'support') {
                 let myHeal = getHealVal(hero.myTags);
                 let otherSupId = activeAllies.find(id => id !== hero.id && heroesDatabase.find(h => h.id === id)?.role === 'support');
@@ -375,18 +375,21 @@
                     let otherHeal = getHealVal(otherSup.myTags);
                     let totalHeal = myHeal + otherHeal;
                     if (otherHeal > 0) {
-                        if (totalHeal < 4) {
-                            appState.allyResults[hero.id].score -= 5.0; // 致命的欠陥として大幅減点
-                            appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【回復量不足】タンクが即死するペア（合計値: ${totalHeal} ＜ 4） (-5.0)</span>`);
+                        if (totalHeal === 3) {
+                            appState.allyResults[hero.id].score -= 2.0;
+                            appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#f97316; font-weight:bold;">【回復量低下】中＋小ヒールで前線維持が困難 (-2.0)</span>`);
+                        } else if (totalHeal <= 2) {
+                            appState.allyResults[hero.id].score -= 3.0;
+                            appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【致命的欠陥】小＋小ヒールでタンクが即死する (-3.0)</span>`);
                         } else {
-                            appState.allyResults[hero.id].score += 0.5; // バランスの良い構成へのボーナス
-                            appState.allyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方とのヒール量バランス◎（合計値: ${totalHeal}） (+0.5)</span>`);
+                            appState.allyResults[hero.id].score += 0.5;
+                            appState.allyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方とのヒール量バランス◎ (+0.5)</span>`);
                         }
                     }
                 }
             }
 
-            // ▼ 敵視点（評価は味方側と同じロジックを反転して適用。※コード量節約のため同様の処理）
+            // ▼ 敵視点（評価は味方側と同じロジックを反転して適用）
             let enemyMapScore = 0; let enemyMapDesc = "";
             if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(enemyMapRaw))) { enemyMapScore = 2.0; enemyMapDesc = hero.mapRuleDesc; } 
             else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) { enemyMapScore = 1.5; enemyMapDesc = hero.mapRuleDesc; } 
@@ -432,12 +435,15 @@
                     let otherHeal = getHealVal(otherSup.myTags);
                     let totalHeal = myHeal + otherHeal;
                     if (otherHeal > 0) {
-                        if (totalHeal < 4) {
-                            appState.enemyResults[hero.id].score -= 5.0;
-                            appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【回復量不足】タンクが即死するペア（合計値: ${totalHeal} ＜ 4） (-5.0)</span>`);
+                        if (totalHeal === 3) {
+                            appState.enemyResults[hero.id].score -= 2.0;
+                            appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#f97316; font-weight:bold;">【回復量低下】中＋小ヒールで前線維持が困難 (-2.0)</span>`);
+                        } else if (totalHeal <= 2) {
+                            appState.enemyResults[hero.id].score -= 3.0;
+                            appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【致命的欠陥】小＋小ヒールでタンクが即死する (-3.0)</span>`);
                         } else {
                             appState.enemyResults[hero.id].score += 0.5;
-                            appState.enemyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方とのヒール量バランス◎（合計値: ${totalHeal}） (+0.5)</span>`);
+                            appState.enemyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方とのヒール量バランス◎ (+0.5)</span>`);
                         }
                     }
                 }
@@ -462,10 +468,19 @@
 
             let scoredHeroes = heroesDatabase.map(hero => {
                 let score = 0;
-                if (hero.antiTargets.includes(eId)) score += 1.5; else if (eHero.myTags.some(tag => hero.antiTargets.includes(tag))) score += 1.0;
-                if (eHero.weakTargets.includes(hero.id)) score += 1.5; else if (hero.myTags.some(tag => eHero.weakTargets.includes(tag))) score += 1.0;
-                if (hero.weakTargets.includes(eId)) score -= 1.5; else if (eHero.myTags.some(tag => hero.weakTargets.includes(tag))) score -= 1.0;
-                if (eHero.antiTargets.includes(hero.id)) score -= 1.5; else if (hero.myTags.some(tag => eHero.antiTargets.includes(tag))) score -= 1.0;
+                
+                if (hero.antiTargets.includes(eId)) score += 1.5;
+                else if (eHero.myTags.some(tag => hero.antiTargets.includes(tag))) score += 1.0;
+                
+                if (eHero.weakTargets.includes(hero.id)) score += 1.5;
+                else if (hero.myTags.some(tag => eHero.weakTargets.includes(tag))) score += 1.0;
+                
+                if (hero.weakTargets.includes(eId)) score -= 1.5;
+                else if (eHero.myTags.some(tag => hero.weakTargets.includes(tag))) score -= 1.0;
+                
+                if (eHero.antiTargets.includes(hero.id)) score -= 1.5;
+                else if (hero.myTags.some(tag => eHero.antiTargets.includes(tag))) score -= 1.0;
+                
                 return { hero, score };
             });
 
@@ -556,14 +571,17 @@
                                 }
                             }
                             
-                            // ★ AIチーム構築でのヒール量チェック（大+小、中+中 の条件を満たさない場合は除外レベルの減点）
+                            // ★ AI推奨チームのヒール量ペナルティ計算
                             let h1 = getHealVal(sups[x].myTags);
                             let h2 = getHealVal(sups[y].myTags);
                             if (h1 > 0 && h2 > 0) {
-                                if (h1 + h2 < 4) {
-                                    score -= 10.0; // AIが間違っても選ばないように特大ペナルティ
+                                let totalHeal = h1 + h2;
+                                if (totalHeal === 3) {
+                                    score -= 4.0; // 2人分の -2.0
+                                } else if (totalHeal <= 2) {
+                                    score -= 6.0; // 2人分の -3.0
                                 } else {
-                                    score += 1.0;  // 構成美ボーナス
+                                    score += 1.0; // 2人分の +0.5
                                 }
                             }
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OWメタツール</title>
+    <title>OW スマホ特化シミュレーター + OpenCV</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -23,7 +23,6 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; padding-bottom: 40px; }
         
-        /* ヘッダー・リセットボタン追加 */
         header { padding: 15px 10px; background-color: var(--panel-bg); box-shadow: 0 2px 8px rgba(0,0,0,0.5); position: sticky; top: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-top { display: flex; justify-content: center; align-items: center; width: 100%; position: relative; }
         h1 { font-size: 1.2rem; margin: 0; }
@@ -32,8 +31,6 @@
         #load-status { font-size: 0.75rem; color: var(--text-sub); margin-top: 5px; }
 
         .container { padding: 15px; display: flex; flex-direction: column; gap: 20px; }
-
-        /* チームタイトル周りのレイアウト（合算値用） */
         .team-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .section-title { font-size: 1rem; font-weight: bold; display: flex; align-items: center; gap: 8px; margin-bottom: 0; }
         .section-title::before { content: ''; display: block; width: 4px; height: 16px; border-radius: 2px; }
@@ -41,11 +38,8 @@
         .title-enemy::before { background-color: var(--accent-enemy); }
         .title-ally::before { background-color: var(--accent-ally); }
         .title-scan::before { background-color: var(--accent-scan); }
-        
-        /* 独立したタイトル（チーム以外）用 */
         .standalone-title { margin-bottom: 10px; }
 
-        /* スキャン・環境 UI */
         .scan-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 15px; border: 1px dashed var(--accent-scan); text-align: center; }
         .scan-btn { background-color: var(--panel-sub); color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; width: 100%; font-size: 1rem; transition: 0.3s; }
         .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -54,7 +48,6 @@
         .env-select-wrap { flex: 1; background-color: var(--panel-bg); border-radius: 8px; border: 1px solid var(--panel-sub); overflow: hidden; }
         .env-select-wrap select { width: 100%; background: transparent; color: #fff; border: none; padding: 12px; font-size: 0.9rem; outline: none; appearance: none; cursor: pointer; }
 
-        /* スロット・アイコンUI */
         .team-row { display: flex; justify-content: space-between; gap: 6px; }
         .slot-wrapper { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; background-color: var(--panel-bg); border-radius: 8px; padding: 6px 4px; border: 2px solid transparent; transition: 0.2s; position: relative; }
         .slot-wrapper.is-selected { border-color: var(--accent-ally); background-color: #2a3b5c; }
@@ -66,21 +59,15 @@
         .slot-support .slot-image-box { border-bottom: 3px solid var(--accent-support); }
         .slot-name { font-size: 0.65rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; color: var(--text-sub); }
 
-        /* 共通スコアバッジ装飾 */
         .score-badge { padding: 2px 6px; border-radius: 8px; font-weight: bold; border: 2px solid var(--bg-color); box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
         .score-plus { background-color: #065f46; color: #34d399; } 
         .score-minus { background-color: #991b1b; color: #f87171; } 
         .score-zero { background-color: var(--panel-sub); color: var(--text-sub); }
-        
-        /* 選択後も右上に表示されるスロット用バッジ */
         .slot-score { position: absolute; top: -6px; right: -4px; font-size: 0.65rem; z-index: 5; display: none; }
         .slot-score.is-visible { display: block; }
-        
-        /* チーム合算値用バッジ */
         .team-score-badge { font-size: 0.85rem; padding: 4px 10px; border: none; box-shadow: none; display: none; }
         .team-score-badge.is-visible { display: block; }
 
-        /* 詳細パネル */
         .details-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 15px; border: 1px solid var(--accent-ally); min-height: 120px; }
         .details-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--panel-sub); }
         .details-hero-name { font-size: 1.2rem; font-weight: bold; }
@@ -88,7 +75,6 @@
         .details-content { display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; line-height: 1.4; color: var(--text-sub); }
         .tag-env { color: #c084fc; } .tag-env-bad { color: #f43f5e; } .tag-anti { color: #34d399; } .tag-synergy { color: #60a5fa; }
 
-        /* モーダル UI */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; display: none; flex-direction: column; justify-content: flex-end; opacity: 0; transition: opacity 0.3s; }
         .modal-overlay.is-active { display: flex; opacity: 1; }
         .modal-content { background-color: var(--bg-color); border-radius: 16px 16px 0 0; width: 100%; max-height: 85vh; display: flex; flex-direction: column; animation: slideUp 0.3s forwards; }
@@ -111,7 +97,7 @@
 
 <header>
     <div class="header-top">
-        <h1>OWメタツール</h1>
+        <h1>OW 構成＆環境シミュレーター</h1>
         <button class="reset-btn" onclick="resetAll()">↻ リセット</button>
     </div>
     <div id="load-status">データを読み込み中...</div>
@@ -121,7 +107,7 @@
     <div>
         <div class="section-title standalone-title title-scan">📷 画像から自動編成 (Beta)</div>
         <div class="scan-panel">
-            <input type="file" id="image-upload" accept="image/*" style="display: none;" onchange="processImageWithOpenCV(event)">
+            <input type="file" id="image-upload" accept="image/*" capture="environment" style="display: none;" onchange="processImageWithOpenCV(event)">
             <button id="scan-btn" class="scan-btn" disabled onclick="document.getElementById('image-upload').click()">⏳ OpenCV 準備中...</button>
             <div class="scan-note">スコアボードの写真から敵キャラを自動検出します。</div>
             <canvas id="hidden-canvas" style="display:none;"></canvas><canvas id="template-canvas" style="display:none;"></canvas>
@@ -183,13 +169,10 @@
     // ⚠️ CSV公開URL
     const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHb34RcBctjEcBeNrixnFu_sfbF7B2sAjFkWVIHcqKcLhmurraDyS2thmJbGTlrF3WNUom2go4P66X/pub?output=csv";
 
-    // デュアルスコア対応に改修
     const appState = {
         enemies: { 'enemy-tank': '', 'enemy-dps1': '', 'enemy-dps2': '', 'enemy-sup1': '', 'enemy-sup2': '' },
         allies: { 'ally-tank': '', 'ally-dps1': '', 'ally-dps2': '', 'ally-sup1': '', 'ally-sup2': '' },
-        focusedSlot: null, 
-        allyResults: {}, 
-        enemyResults: {}
+        focusedSlot: null, allyResults: {}, enemyResults: {}
     };
 
     let heroesDatabase = [];
@@ -223,11 +206,25 @@
 
     function analyzeImage(imgElement) {
         try {
-            let src = cv.imread(imgElement);
+            // 修正箇所：巨大すぎるスマホ画像を幅1200pxに自動リサイズして負荷を下げる
+            const canvas = document.getElementById('hidden-canvas');
+            const MAX_WIDTH = 1200;
+            let scale = 1;
+            if (imgElement.width > MAX_WIDTH) { scale = MAX_WIDTH / imgElement.width; }
+            canvas.width = imgElement.width * scale;
+            canvas.height = imgElement.height * scale;
+            const ctxCanvas = canvas.getContext('2d');
+            ctxCanvas.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+
+            let src = cv.imread(canvas);
             let srcGray = new cv.Mat();
             cv.cvtColor(src, srcGray, cv.COLOR_RGBA2GRAY);
-            const MATCH_THRESHOLD = 0.70;
+            
+            // 修正箇所：閾値を下げてヒットしやすくする（0.70 -> 0.55）
+            const MATCH_THRESHOLD = 0.55;
             let foundTanks = [], foundDps = [], foundSupports = [];
+            let maxMatchScore = 0; // デバッグ用
+
             const templateCanvas = document.getElementById('template-canvas');
             const ctx = templateCanvas.getContext('2d', { willReadFrequently: true });
 
@@ -235,6 +232,7 @@
                 const templImg = new Image();
                 templImg.src = `images/${hero.id}.png`; 
                 try {
+                    if(!templImg.width) return;
                     templateCanvas.width = templImg.width;
                     templateCanvas.height = templImg.height;
                     ctx.drawImage(templImg, 0, 0);
@@ -248,10 +246,12 @@
                     cv.matchTemplate(srcGray, templGray, dst, cv.TM_CCOEFF_NORMED, mask);
                     let result = cv.minMaxLoc(dst, mask);
 
+                    if (result.maxVal > maxMatchScore) maxMatchScore = result.maxVal;
+
                     if (result.maxVal >= MATCH_THRESHOLD) {
-                        if (hero.role === 'tank') foundTanks.push(hero.id);
-                        if (hero.role === 'dps') foundDps.push(hero.id);
-                        if (hero.role === 'support') foundSupports.push(hero.id);
+                        if (hero.role === 'tank' && !foundTanks.includes(hero.id)) foundTanks.push(hero.id);
+                        if (hero.role === 'dps' && !foundDps.includes(hero.id)) foundDps.push(hero.id);
+                        if (hero.role === 'support' && !foundSupports.includes(hero.id)) foundSupports.push(hero.id);
                     }
                     templ.delete(); templGray.delete(); dst.delete(); mask.delete();
                 } catch(err) {}
@@ -269,7 +269,15 @@
             const btn = document.getElementById('scan-btn');
             btn.innerText = "📷 カメラ / 画像から編成を読み込む";
             btn.disabled = false;
-            alert("画像解析が完了しました！\n（※サイズや角度の違いで検出漏れがある場合は手動で調整してください）");
+            
+            // 修正箇所：検出結果をわかりやすくアラートで出す
+            const totalFound = foundTanks.length + foundDps.length + foundSupports.length;
+            if (totalFound > 0) {
+                alert(`画像解析が完了しました！\n（検出: タンク${foundTanks.length}体, DPS${foundDps.length}体, サポ${foundSupports.length}体）`);
+            } else {
+                alert(`解析完了しましたが、キャラを検出できませんでした。\n（最高一致スコア: ${maxMatchScore.toFixed(2)} / 必要なスコア: ${MATCH_THRESHOLD}）\n\n【ヒント】\nカメラで撮ったアイコンの大きさと、imagesフォルダ内のアイコンの大きさが違いすぎるか、画面の反射が原因です。スマホをモニターに近づけたり遠ざけたりして撮り直してみてください。`);
+            }
+
         } catch (error) {
             console.error("OpenCV Error:", error);
             const btn = document.getElementById('scan-btn');
@@ -290,17 +298,13 @@
         }
     }
 
-    // 全てをクリアするリセット関数
     function resetAll() {
         if(!confirm("編成と環境をすべてリセットしますか？")) return;
-        
         appState.enemies = { 'enemy-tank': '', 'enemy-dps1': '', 'enemy-dps2': '', 'enemy-sup1': '', 'enemy-sup2': '' };
         appState.allies = { 'ally-tank': '', 'ally-dps1': '', 'ally-dps2': '', 'ally-sup1': '', 'ally-sup2': '' };
         appState.focusedSlot = null;
-
         document.getElementById("match-rule").value = "";
         updateMapOptions();
-
         ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2', 'ally-tank','ally-dps1','ally-dps2','ally-sup1','ally-sup2'].forEach(slotId => {
             const defaultChar = slotId.includes('tank') ? 'T' : slotId.includes('dps') ? 'D' : 'S';
             document.getElementById(`img-${slotId}`).innerHTML = defaultChar;
@@ -308,7 +312,6 @@
             document.getElementById(`score-${slotId}`).classList.remove('is-visible');
             document.getElementById(`wrap-${slotId}`).classList.remove('is-selected');
         });
-
         updateSimulation();
     }
 
@@ -360,86 +363,48 @@
         } catch (error) { document.getElementById("load-status").innerText = "エラー: データの読み込みに失敗しました。"; }
     }
 
-    // ★対称（デュアル）評価ロジックに大幅刷新
     function updateSimulation() {
         if(heroesDatabase.length === 0) return;
-        
         const currentRule = document.getElementById("match-rule").value.toLowerCase();
         const currentMapRaw = document.getElementById("match-map").value.toLowerCase();
         let currentMapBase = currentMapRaw; let currentSide = "";
         if (currentMapRaw.endsWith("_atk")) { currentMapBase = currentMapRaw.replace("_atk", ""); currentSide = "atk"; } else if (currentMapRaw.endsWith("_def")) { currentMapBase = currentMapRaw.replace("_def", ""); currentSide = "def"; }
         const activeEnvTags = [currentRule, currentMapBase, currentSide, currentMapRaw].filter(t => t !== "");
-        
         const activeAllies = Object.values(appState.allies).filter(v => v !== "");
         const activeEnemies = Object.values(appState.enemies).filter(v => v !== "");
 
-        appState.allyResults = {};
-        appState.enemyResults = {};
-        
-        heroesDatabase.forEach(h => { 
-            appState.allyResults[h.id] = { hero: h, score: 0, details: [] }; 
-            appState.enemyResults[h.id] = { hero: h, score: 0, details: [] }; 
-        });
+        appState.allyResults = {}; appState.enemyResults = {};
+        heroesDatabase.forEach(h => { appState.allyResults[h.id] = { hero: h, score: 0, details: [] }; appState.enemyResults[h.id] = { hero: h, score: 0, details: [] }; });
 
         heroesDatabase.forEach(hero => {
-            // ==========================================
-            // ① 味方視点での評価 (allyResults)
-            // ==========================================
             if (activeEnvTags.length > 0 && hero.mapRuleTargets.some(tag => activeEnvTags.includes(tag))) { appState.allyResults[hero.id].score += 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc ? `: ${hero.mapRuleDesc}` : ""} (+1.0)</span>`); }
             if (activeEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => activeEnvTags.includes(tag))) { appState.allyResults[hero.id].score -= 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc ? `: ${hero.badMapRuleDesc}` : ""} (-1.0)</span>`); }
-            
-            // 対 敵チーム (Anti / Weak)
-            activeEnemies.forEach(eId => { 
-                const e = heroesDatabase.find(h => h.id === eId); if (!e) return; 
-                if (hero.antiTargets.includes(eId) || e.myTags.some(tag => hero.antiTargets.includes(tag))) { appState.allyResults[hero.id].score += 1.5; appState.allyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${e.name}${hero.antiDesc ? `: ${hero.antiDesc}` : ""} (+1.5)</span>`); } 
-                if (hero.weakTargets.includes(eId) || e.myTags.some(tag => hero.weakTargets.includes(tag))) { appState.allyResults[hero.id].score -= 1.5; appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${e.name}${hero.weakDesc ? `: ${hero.weakDesc}` : ""} (-1.5)</span>`); }
-            });
-            // 対 味方チーム (Synergy)
+            activeEnemies.forEach(eId => { const e = heroesDatabase.find(h => h.id === eId); if (!e) return; if (hero.antiTargets.includes(eId) || e.myTags.some(tag => hero.antiTargets.includes(tag))) { appState.allyResults[hero.id].score += 1.5; appState.allyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${e.name}${hero.antiDesc ? `: ${hero.antiDesc}` : ""} (+1.5)</span>`); } if (hero.weakTargets.includes(eId) || e.myTags.some(tag => hero.weakTargets.includes(tag))) { appState.allyResults[hero.id].score -= 1.5; appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${e.name}${hero.weakDesc ? `: ${hero.weakDesc}` : ""} (-1.5)</span>`); }});
             activeAllies.forEach(aId => { if(aId === hero.id) return; const a = heroesDatabase.find(h => h.id === aId); if (!a) return; if (hero.synergyTargets.includes(aId) || a.myTags.some(tag => hero.synergyTargets.includes(tag))) { appState.allyResults[hero.id].score += 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-synergy">【味方相性】with ${a.name}${hero.synergyDesc ? `: ${hero.synergyDesc}` : ""} (+1.0)</span>`); } });
 
-            // ==========================================
-            // ② 敵視点での評価 (enemyResults)
-            // ==========================================
             if (activeEnvTags.length > 0 && hero.mapRuleTargets.some(tag => activeEnvTags.includes(tag))) { appState.enemyResults[hero.id].score += 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc ? `: ${hero.mapRuleDesc}` : ""} (+1.0)</span>`); }
             if (activeEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => activeEnvTags.includes(tag))) { appState.enemyResults[hero.id].score -= 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc ? `: ${hero.badMapRuleDesc}` : ""} (-1.0)</span>`); }
-            
-            // 対 味方チーム (Anti / Weak)
-            activeAllies.forEach(aId => { 
-                const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
-                // 敵が味方を狩れるなら有利
-                if (hero.antiTargets.includes(aId) || a.myTags.some(tag => hero.antiTargets.includes(tag))) { appState.enemyResults[hero.id].score += 1.5; appState.enemyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${a.name}${hero.antiDesc ? `: ${hero.antiDesc}` : ""} (+1.5)</span>`); } 
-                // 敵が味方に狩られるなら不利
-                if (hero.weakTargets.includes(aId) || a.myTags.some(tag => hero.weakTargets.includes(tag))) { appState.enemyResults[hero.id].score -= 1.5; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${a.name}${hero.weakDesc ? `: ${hero.weakDesc}` : ""} (-1.5)</span>`); }
-            });
-            // 対 敵自身チーム (Synergy)
+            activeAllies.forEach(aId => { const a = heroesDatabase.find(h => h.id === aId); if (!a) return; if (hero.antiTargets.includes(aId) || a.myTags.some(tag => hero.antiTargets.includes(tag))) { appState.enemyResults[hero.id].score += 1.5; appState.enemyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${a.name}${hero.antiDesc ? `: ${hero.antiDesc}` : ""} (+1.5)</span>`); } if (hero.weakTargets.includes(aId) || a.myTags.some(tag => hero.weakTargets.includes(tag))) { appState.enemyResults[hero.id].score -= 1.5; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${a.name}${hero.weakDesc ? `: ${hero.weakDesc}` : ""} (-1.5)</span>`); }});
             activeEnemies.forEach(eId => { if(eId === hero.id) return; const e = heroesDatabase.find(h => h.id === eId); if (!e) return; if (hero.synergyTargets.includes(eId) || e.myTags.some(tag => hero.synergyTargets.includes(tag))) { appState.enemyResults[hero.id].score += 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-synergy">【敵同士相性】with ${e.name}${hero.synergyDesc ? `: ${hero.synergyDesc}` : ""} (+1.0)</span>`); } });
         });
 
-        updateScoresUI();
-        renderDetailsPanel();
+        updateScoresUI(); renderDetailsPanel();
     }
 
-    // 画面上のスコアバッジとチーム合算値を反映
     function updateScoresUI() {
         let allyTotal = 0; let enemyTotal = 0;
-
         ['ally-tank', 'ally-dps1', 'ally-dps2', 'ally-sup1', 'ally-sup2'].forEach(slotId => {
             const heroId = appState.allies[slotId]; const badge = document.getElementById(`score-${slotId}`);
             if (heroId) { const s = appState.allyResults[heroId].score; allyTotal += s; updateBadgeClass(badge, s); } else { badge.classList.remove('is-visible'); }
         });
-
         ['enemy-tank', 'enemy-dps1', 'enemy-dps2', 'enemy-sup1', 'enemy-sup2'].forEach(slotId => {
             const heroId = appState.enemies[slotId]; const badge = document.getElementById(`score-${slotId}`);
             if (heroId) { const s = appState.enemyResults[heroId].score; enemyTotal += s; updateBadgeClass(badge, s); } else { badge.classList.remove('is-visible'); }
         });
 
-        // 合算値バッジ
         const allyTeamBadge = document.getElementById('ally-team-score');
         const enemyTeamBadge = document.getElementById('enemy-team-score');
-        updateBadgeClass(allyTeamBadge, allyTotal, true);
-        updateBadgeClass(enemyTeamBadge, enemyTotal, true);
-        
-        // 誰かが選ばれている時だけ合算値を表示
+        updateBadgeClass(allyTeamBadge, allyTotal, true); updateBadgeClass(enemyTeamBadge, enemyTotal, true);
         if (Object.values(appState.allies).some(v => v !== "")) allyTeamBadge.classList.add('is-visible'); else allyTeamBadge.classList.remove('is-visible');
         if (Object.values(appState.enemies).some(v => v !== "")) enemyTeamBadge.classList.add('is-visible'); else enemyTeamBadge.classList.remove('is-visible');
     }
@@ -453,7 +418,6 @@
 
     function handleImageTap(event, slotId, role) { event.stopPropagation(); openModal(slotId, role); }
     
-    // 枠選択時（敵味方両対応）
     function selectFrame(slotId) { 
         document.querySelectorAll('.slot-wrapper').forEach(el => el.classList.remove('is-selected')); 
         const wrapper = document.getElementById(`wrap-${slotId}`); 
@@ -465,15 +429,11 @@
     function renderDetailsPanel() {
         const panel = document.getElementById("details-panel");
         if (!appState.focusedSlot) { panel.innerHTML = `<div style="text-align:center; color:#64748b; margin-top:20px;">キャラクターの「枠」をタップすると、<br>現在の構成に対する強み・弱みが表示されます。</div>`; return; }
-        
         const isEnemy = appState.focusedSlot.startsWith('enemy-');
         const heroId = isEnemy ? appState.enemies[appState.focusedSlot] : appState.allies[appState.focusedSlot];
-        
         if (!heroId) { panel.innerHTML = `<div style="text-align:center; color:#64748b; margin-top:20px;">キャラクターが未選択です。<br>画像をタップしてキャラを選択してください。</div>`; return; }
         
-        // 敵の枠を選択している時は、敵視点でのスコアを参照
         const result = isEnemy ? appState.enemyResults[heroId] : appState.allyResults[heroId];
-        
         let badgeClass = "score-zero"; let scoreText = result.score > 0 ? `+${result.score.toFixed(1)}` : result.score.toFixed(1);
         if (result.score > 0) badgeClass = "score-plus"; if (result.score < 0) badgeClass = "score-minus";
         const detailsHtml = result.details.length > 0 ? result.details.join("<br>") : "特に有利・不利な情報はありません（五分五分）。";
@@ -487,15 +447,9 @@
         document.getElementById("modal-title").innerText = isEnemy ? "敵を選択 (点数順)" : "味方を選択 (点数順)";
         modalList.innerHTML = `<div class="modal-item clear-btn" onclick="selectHero('')"><div style="text-align:center; width:100%;">× 選択を外す (クリア)</div></div>`;
         
-        // モーダルでも、敵・味方それぞれの視点でのスコアを参照する
-        let candidates = isEnemy 
-            ? Object.values(appState.enemyResults).filter(item => item.hero.role === roleTarget)
-            : Object.values(appState.allyResults).filter(item => item.hero.role === roleTarget);
-            
+        let candidates = isEnemy ? Object.values(appState.enemyResults).filter(item => item.hero.role === roleTarget) : Object.values(appState.allyResults).filter(item => item.hero.role === roleTarget);
         const usedAllies = Object.values(appState.allies); const usedEnemies = Object.values(appState.enemies);
         candidates = candidates.filter(item => { if (isEnemy) return !usedEnemies.includes(item.hero.id); else return !usedAllies.includes(item.hero.id); });
-        
-        // 両方とも点数順でソート
         candidates.sort((a, b) => b.score - a.score);
         
         candidates.forEach(item => {

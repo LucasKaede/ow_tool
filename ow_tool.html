@@ -51,7 +51,6 @@
         .camera-video-container { position: relative; flex-grow: 1; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         #camera-video { position: absolute; min-width: 100%; min-height: 100%; object-fit: cover; }
         
-        /* ★修正：ガイド枠を常に16:9の横長に固定し、横向き撮影を促す */
         .camera-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90vw; max-width: 800px; aspect-ratio: 16 / 9; border: 3px dashed #ec4899; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; pointer-events: none; }
         .camera-guide::after { content: 'スマホを横向きに倒し、モニター全体を枠に入れる'; position: absolute; top: -30px; color: #fff; font-size: 1rem; font-weight: bold; width: 100%; text-align: center; white-space: nowrap; text-shadow: 0 2px 4px #000; }
         
@@ -247,7 +246,6 @@
         
         stopLiveCamera();
         
-        // 処理が重くなるため、少しディレイを入れてUIを更新させる
         setTimeout(() => { analyzeImageFromCanvas(canvas); }, 100);
     }
 
@@ -274,7 +272,7 @@
         };
     }
 
-    // ★大幅修正：8パターンのサイズ探索と閾値の緩和
+    // ★透過マスクを適用した新解析ロジック
     function analyzeImageFromCanvas(sourceCanvas) {
         try {
             document.getElementById('scan-live-btn').innerText = "🔄 解析中... (数秒かかります)";
@@ -285,7 +283,7 @@
             let srcGray = new cv.Mat();
             cv.cvtColor(src, srcGray, cv.COLOR_RGBA2GRAY);
             
-            const MATCH_THRESHOLD = 0.50; // モアレを考慮し閾値をさらに緩和
+            const MATCH_THRESHOLD = 0.55; 
             let foundTanks = [], foundDps = [], foundSupports = [];
             let maxMatchScore = 0;
 
@@ -294,16 +292,10 @@
 
             const cWidth = sourceCanvas.width;
             
-            // 4.5% 〜 8.0% まで、0.5%刻みで8パターン総当たり
             const expectedSizes = [
-                Math.round(cWidth * 0.045),
-                Math.round(cWidth * 0.050),
-                Math.round(cWidth * 0.055),
-                Math.round(cWidth * 0.060),
-                Math.round(cWidth * 0.065),
-                Math.round(cWidth * 0.070),
-                Math.round(cWidth * 0.075),
-                Math.round(cWidth * 0.080)
+                Math.round(cWidth * 0.045), Math.round(cWidth * 0.050), Math.round(cWidth * 0.055),
+                Math.round(cWidth * 0.060), Math.round(cWidth * 0.065), Math.round(cWidth * 0.070),
+                Math.round(cWidth * 0.075), Math.round(cWidth * 0.080)
             ];
 
             heroesDatabase.forEach(hero => {
@@ -314,22 +306,32 @@
                     let bestHeroScore = 0;
 
                     expectedSizes.forEach(targetSize => {
+                        // 1. Canvasをきれいにクリアする（以前の画像が残らないように）
+                        ctx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
                         templateCanvas.width = targetSize;
                         templateCanvas.height = targetSize;
                         ctx.drawImage(templImg, 0, 0, targetSize, targetSize);
 
+                        // 2. テンプレート画像を読み込み
                         let templ = cv.imread(templateCanvas);
                         let templGray = new cv.Mat();
                         cv.cvtColor(templ, templGray, cv.COLOR_RGBA2GRAY);
 
+                        // 3. ★アルファチャンネル（透過度）を抽出して「マスク」を作成
+                        let rgbaPlanes = new cv.MatVector();
+                        cv.split(templ, rgbaPlanes);
+                        let alphaMask = rgbaPlanes.get(3);
+
                         let dst = new cv.Mat();
-                        let mask = new cv.Mat();
-                        cv.matchTemplate(srcGray, templGray, dst, cv.TM_CCOEFF_NORMED, mask);
-                        let result = cv.minMaxLoc(dst, mask);
+                        let emptyMask = new cv.Mat();
+
+                        // 4. ★透過部分を無視してマッチング実行
+                        cv.matchTemplate(srcGray, templGray, dst, cv.TM_CCOEFF_NORMED, alphaMask);
+                        let result = cv.minMaxLoc(dst, emptyMask);
 
                         if (result.maxVal > bestHeroScore) bestHeroScore = result.maxVal;
 
-                        templ.delete(); templGray.delete(); dst.delete(); mask.delete();
+                        templ.delete(); templGray.delete(); rgbaPlanes.delete(); alphaMask.delete(); dst.delete(); emptyMask.delete();
                     });
 
                     if (bestHeroScore > maxMatchScore) maxMatchScore = bestHeroScore;
@@ -359,7 +361,7 @@
             if (totalFound > 0) {
                 alert(`画像解析が完了しました！\n（検出: タンク${foundTanks.length}体, DPS${foundDps.length}体, サポ${foundSupports.length}体）`);
             } else {
-                alert(`キャラが見つかりませんでした。\n\n【最高一致スコア: ${maxMatchScore.toFixed(2)}】\n（※0.50以上で検出されます）\n\n・スマホを【横向き】にして、画面いっぱいにモニターを映してください。\n・imagesフォルダの画像が四角いアイコンであることを確認してください。`);
+                alert(`キャラが見つかりませんでした。\n\n【最高一致スコア: ${maxMatchScore.toFixed(2)}】\n（※0.55以上で検出されます）\n\n・スマホを【横向き】にして、画面いっぱいにモニターを映してください。\n・imagesフォルダの画像が四角いアイコンであることを確認してください。`);
             }
 
         } catch (error) {

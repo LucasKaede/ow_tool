@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OWメタツール</title>
+    <title>OW メタツール</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -41,9 +41,23 @@
         .standalone-title { margin-bottom: 10px; }
 
         .scan-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 15px; border: 1px dashed var(--accent-scan); text-align: center; }
-        .scan-btn { background-color: var(--panel-sub); color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; width: 100%; font-size: 1rem; transition: 0.3s; }
-        .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .scan-btn { background-color: var(--accent-scan); color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; width: 100%; font-size: 1rem; transition: 0.3s; margin-bottom: 10px; cursor: pointer; }
+        .scan-btn-sub { background-color: var(--panel-sub); color: var(--text-main); border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; width: 100%; font-size: 0.9rem; cursor: pointer; }
+        .scan-btn:disabled, .scan-btn-sub:disabled { opacity: 0.5; cursor: not-allowed; }
         .scan-note { font-size: 0.75rem; color: var(--text-sub); margin-top: 10px; line-height: 1.4; }
+        
+        /* リアルタイムカメラ用のフルスクリーンUI */
+        .camera-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
+        .camera-overlay.is-active { display: flex; }
+        .camera-video-container { position: relative; flex-grow: 1; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        #camera-video { position: absolute; min-width: 100%; min-height: 100%; object-fit: cover; }
+        /* アイコンを合わせるためのガイド枠（横長） */
+        .camera-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; height: 120px; border: 3px dashed #ec4899; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; pointer-events: none; }
+        .camera-guide::after { content: '敵チームのアイコンをこの枠の大きさに合わせる'; position: absolute; top: -30px; color: #fff; font-size: 0.8rem; font-weight: bold; width: 100%; text-align: center; white-space: nowrap; }
+        .camera-controls { padding: 20px; background: #000; display: flex; justify-content: space-between; gap: 15px; padding-bottom: 40px; }
+        .cam-btn-cancel { flex: 1; padding: 15px; border-radius: 10px; background: var(--panel-sub); color: #fff; border: none; font-weight: bold; font-size: 1rem; }
+        .cam-btn-shoot { flex: 2; padding: 15px; border-radius: 10px; background: var(--accent-scan); color: #fff; border: none; font-weight: bold; font-size: 1.1rem; }
+
         .env-row { display: flex; gap: 10px; }
         .env-select-wrap { flex: 1; background-color: var(--panel-bg); border-radius: 8px; border: 1px solid var(--panel-sub); overflow: hidden; }
         .env-select-wrap select { width: 100%; background: transparent; color: #fff; border: none; padding: 12px; font-size: 0.9rem; outline: none; appearance: none; cursor: pointer; }
@@ -97,7 +111,7 @@
 
 <header>
     <div class="header-top">
-        <h1>OWメタツール</h1>
+        <h1>OW メタツール</h1>
         <button class="reset-btn" onclick="resetAll()">↻ リセット</button>
     </div>
     <div id="load-status">データを読み込み中...</div>
@@ -107,10 +121,12 @@
     <div>
         <div class="section-title standalone-title title-scan">📷 画像から自動編成 (Beta)</div>
         <div class="scan-panel">
-            <input type="file" id="image-upload" accept="image/*" capture="environment" style="display: none;" onchange="processImageWithOpenCV(event)">
-            <button id="scan-btn" class="scan-btn" disabled onclick="document.getElementById('image-upload').click()">⏳ OpenCV 準備中...</button>
-            <div class="scan-note">スコアボードの写真から敵キャラを自動検出します。</div>
-            <canvas id="hidden-canvas" style="display:none;"></canvas><canvas id="template-canvas" style="display:none;"></canvas>
+            <input type="file" id="image-upload" accept="image/*" style="display: none;" onchange="processFileImage(event)">
+            <button id="scan-live-btn" class="scan-btn" disabled onclick="startLiveCamera()">📷 リアルタイム スキャン</button>
+            <button id="scan-file-btn" class="scan-btn-sub" disabled onclick="document.getElementById('image-upload').click()">📁 保存した写真から読み込む</button>
+            <div class="scan-note">スコアボードをカメラで写して敵キャラを自動検出します。</div>
+            <canvas id="hidden-canvas" style="display:none;"></canvas>
+            <canvas id="template-canvas" style="display:none;"></canvas>
         </div>
     </div>
 
@@ -158,6 +174,17 @@
     </div>
 </div>
 
+<div class="camera-overlay" id="camera-overlay">
+    <div class="camera-video-container">
+        <video id="camera-video" autoplay playsinline></video>
+        <div class="camera-guide"></div>
+    </div>
+    <div class="camera-controls">
+        <button class="cam-btn-cancel" onclick="stopLiveCamera()">キャンセル</button>
+        <button class="cam-btn-shoot" onclick="captureLiveCamera()">スキャン実行</button>
+    </div>
+</div>
+
 <div class="modal-overlay" id="hero-modal" onclick="closeModal(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
         <div class="modal-header"><div class="modal-title" id="modal-title">キャラクターを選択</div><button class="modal-close" onclick="closeModal()">&times;</button></div>
@@ -177,60 +204,99 @@
 
     let heroesDatabase = [];
     let isCvReady = false;
+    let cameraStream = null;
 
     function onOpenCvReady() {
         isCvReady = true;
-        const btn = document.getElementById('scan-btn');
-        btn.innerText = "📷 カメラ / 画像から編成を読み込む";
-        btn.style.backgroundColor = "var(--accent-scan)";
-        btn.disabled = false;
+        document.getElementById('scan-live-btn').disabled = false;
+        document.getElementById('scan-file-btn').disabled = false;
     }
 
-    async function processImageWithOpenCV(e) {
+    // ========== リアルタイムカメラ制御 ==========
+    async function startLiveCamera() {
+        if (!isCvReady || heroesDatabase.length === 0) return;
+        const video = document.getElementById('camera-video');
+        try {
+            // 背面カメラを要求
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+            video.srcObject = cameraStream;
+            document.getElementById('camera-overlay').classList.add('is-active');
+        } catch (err) {
+            alert("カメラの起動に失敗しました。\n・ブラウザのカメラ権限が許可されているか\n・「https」またはローカル環境(127.0.0.1)で開いているか\nを確認してください。\n（※TrebEditの場合は地球儀マークから開いてください）");
+        }
+    }
+
+    function stopLiveCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        document.getElementById('camera-overlay').classList.remove('is-active');
+    }
+
+    function captureLiveCamera() {
+        const video = document.getElementById('camera-video');
+        const canvas = document.getElementById('hidden-canvas');
+        if(!video.videoWidth) return; // 映像準備前防止
+        
+        // カメラの現在のフレームをCanvasに描画
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        stopLiveCamera();
+        
+        // 解析実行
+        setTimeout(() => { analyzeImageFromCanvas(canvas); }, 50);
+    }
+
+    // ========== ファイルアップロード制御 (予備) ==========
+    async function processFileImage(e) {
         if (!isCvReady || heroesDatabase.length === 0) return;
         const file = e.target.files[0];
         if (!file) return;
-
-        const btn = document.getElementById('scan-btn');
-        btn.innerText = "🔄 解析中... (少々お待ちください)";
-        btn.disabled = true;
 
         const imgUrl = URL.createObjectURL(file);
         const imgElement = new Image();
         imgElement.src = imgUrl;
 
         imgElement.onload = async () => {
-            setTimeout(() => { analyzeImage(imgElement); }, 50);
-        };
-    }
-
-    function analyzeImage(imgElement) {
-        try {
-            // 修正箇所：巨大すぎるスマホ画像を幅1200pxに自動リサイズして負荷を下げる
             const canvas = document.getElementById('hidden-canvas');
             const MAX_WIDTH = 1200;
             let scale = 1;
             if (imgElement.width > MAX_WIDTH) { scale = MAX_WIDTH / imgElement.width; }
             canvas.width = imgElement.width * scale;
             canvas.height = imgElement.height * scale;
-            const ctxCanvas = canvas.getContext('2d');
-            ctxCanvas.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+            
+            setTimeout(() => { analyzeImageFromCanvas(canvas); }, 50);
+        };
+    }
 
-            let src = cv.imread(canvas);
+    // ========== OpenCV 解析コア処理 ==========
+    function analyzeImageFromCanvas(sourceCanvas) {
+        try {
+            document.getElementById('scan-live-btn').innerText = "🔄 解析中...";
+            document.getElementById('scan-live-btn').disabled = true;
+
+            let src = cv.imread(sourceCanvas);
             let srcGray = new cv.Mat();
             cv.cvtColor(src, srcGray, cv.COLOR_RGBA2GRAY);
             
-            // 修正箇所：閾値を下げてヒットしやすくする（0.70 -> 0.55）
-            const MATCH_THRESHOLD = 0.55;
+            const MATCH_THRESHOLD = 0.55; // 甘めの閾値
             let foundTanks = [], foundDps = [], foundSupports = [];
-            let maxMatchScore = 0; // デバッグ用
+            let maxMatchScore = 0;
 
             const templateCanvas = document.getElementById('template-canvas');
             const ctx = templateCanvas.getContext('2d', { willReadFrequently: true });
 
             heroesDatabase.forEach(hero => {
                 const templImg = new Image();
-                templImg.src = `images02/${hero.id}.png`; 
+                templImg.src = `images/${hero.id}.png`; 
                 try {
                     if(!templImg.width) return;
                     templateCanvas.width = templImg.width;
@@ -266,23 +332,20 @@
 
             updateSimulation();
 
-            const btn = document.getElementById('scan-btn');
-            btn.innerText = "📷 カメラ / 画像から編成を読み込む";
-            btn.disabled = false;
+            document.getElementById('scan-live-btn').innerText = "📷 リアルタイム スキャン";
+            document.getElementById('scan-live-btn').disabled = false;
             
-            // 修正箇所：検出結果をわかりやすくアラートで出す
             const totalFound = foundTanks.length + foundDps.length + foundSupports.length;
             if (totalFound > 0) {
                 alert(`画像解析が完了しました！\n（検出: タンク${foundTanks.length}体, DPS${foundDps.length}体, サポ${foundSupports.length}体）`);
             } else {
-                alert(`解析完了しましたが、キャラを検出できませんでした。\n（最高一致スコア: ${maxMatchScore.toFixed(2)} / 必要なスコア: ${MATCH_THRESHOLD}）\n\n【ヒント】\nカメラで撮ったアイコンの大きさと、images02フォルダ内のアイコンの大きさが違いすぎるか、画面の反射が原因です。スマホをモニターに近づけたり遠ざけたりして撮り直してみてください。`);
+                alert(`解析を完了しましたが、キャラが見つかりませんでした。\n\n【最高一致スコア: ${maxMatchScore.toFixed(2)}】\n（※0.55以上で検出されます）\n\n・スマホを前後に動かし、ガイド枠と「画像のサイズ」を合わせ直してください。\n・光の反射が入らないように撮影してください。`);
             }
 
         } catch (error) {
             console.error("OpenCV Error:", error);
-            const btn = document.getElementById('scan-btn');
-            btn.innerText = "📷 カメラ / 画像から編成を読み込む";
-            btn.disabled = false;
+            document.getElementById('scan-live-btn').innerText = "📷 リアルタイム スキャン";
+            document.getElementById('scan-live-btn').disabled = false;
             alert("解析中にエラーが発生しました。");
         }
     }
@@ -293,7 +356,7 @@
         const nameBox = document.getElementById(`name-${slotId}`);
         const h = heroesDatabase.find(x => x.id === heroId);
         if(h) {
-            imgBox.innerHTML = `<img src="images02/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`;
+            imgBox.innerHTML = `<img src="images/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`;
             nameBox.innerText = h.name;
         }
     }
@@ -453,7 +516,7 @@
         candidates.sort((a, b) => b.score - a.score);
         
         candidates.forEach(item => {
-            const h = item.hero; const iconPath = `images02/${h.id}.png`;
+            const h = item.hero; const iconPath = `images/${h.id}.png`;
             let badgeClass = "score-zero"; let scoreText = item.score > 0 ? `+${item.score.toFixed(1)}` : item.score.toFixed(1); 
             if (item.score > 0) badgeClass = "score-plus"; if (item.score < 0) badgeClass = "score-minus"; 
             let scoreHtml = `<span class="score-badge ${badgeClass}">${scoreText}</span>`;
@@ -465,7 +528,7 @@
     function selectHero(heroId) {
         if (currentModalSlotId.startsWith('enemy-')) { appState.enemies[currentModalSlotId] = heroId; } else { appState.allies[currentModalSlotId] = heroId; }
         const imgBox = document.getElementById(`img-${currentModalSlotId}`); const nameBox = document.getElementById(`name-${currentModalSlotId}`);
-        if (heroId) { const h = heroesDatabase.find(x => x.id === heroId); imgBox.innerHTML = `<img src="images02/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; nameBox.innerText = h.name; } 
+        if (heroId) { const h = heroesDatabase.find(x => x.id === heroId); imgBox.innerHTML = `<img src="images/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; nameBox.innerText = h.name; } 
         else { imgBox.innerHTML = currentModalSlotId.includes('tank') ? 'T' : currentModalSlotId.includes('dps') ? 'D' : 'S'; nameBox.innerText = "未選択"; }
         closeModal(); updateSimulation();
     }

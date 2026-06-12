@@ -123,7 +123,7 @@
         </div>
     </div>
 
-    <!-- 味方チーム (上に配置) -->
+    <!-- 味方チーム -->
     <div>
         <div class="team-title-row">
             <div class="section-title title-ally">味方チーム (Ally)</div>
@@ -138,7 +138,7 @@
         </div>
     </div>
 
-    <!-- 敵チーム (下に配置) -->
+    <!-- 敵チーム -->
     <div>
         <div class="team-title-row">
             <div class="section-title title-enemy">敵チーム (Enemy)</div>
@@ -277,21 +277,41 @@
             currentMapBase = currentMapRaw.replace("_def", ""); allySide = "def"; enemySide = "atk"; enemyMapRaw = currentMapBase + "_atk";
         }
 
-        const allyEnvTags = [currentRule, currentMapBase, allySide, allyMapRaw].filter(t => t !== "");
-        const enemyEnvTags = [currentRule, currentMapBase, enemySide, enemyMapRaw].filter(t => t !== "");
-
         const activeAllies = Object.values(appState.allies).filter(v => v !== "");
         const activeEnemies = Object.values(appState.enemies).filter(v => v !== "");
 
         appState.allyResults = {}; appState.enemyResults = {};
         heroesDatabase.forEach(h => { appState.allyResults[h.id] = { hero: h, score: 0, details: [] }; appState.enemyResults[h.id] = { hero: h, score: 0, details: [] }; });
 
-        // ★名指し(1.5点) ＞ タグ(1.0点) の優先順位を適用（合算しない）
         heroesDatabase.forEach(hero => {
-            // ▼ 味方視点
-            if (allyEnvTags.length > 0 && hero.mapRuleTargets.some(tag => allyEnvTags.includes(tag))) { appState.allyResults[hero.id].score += 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc ? `: ${hero.mapRuleDesc}` : ""} (+1.0)</span>`); }
-            if (allyEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => allyEnvTags.includes(tag))) { appState.allyResults[hero.id].score -= 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc ? `: ${hero.badMapRuleDesc}` : ""} (-1.0)</span>`); }
+            // ▼ 味方視点：マップ環境評価（名指し ＞ ルール）
+            let mapScore = 0; let mapDesc = "";
+            if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(allyMapRaw))) {
+                mapScore = 2.0; mapDesc = hero.mapRuleDesc;
+            } else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) {
+                mapScore = 1.5; mapDesc = hero.mapRuleDesc;
+            } else if (allySide !== "" && hero.mapRuleTargets.includes(allySide)) {
+                mapScore = 1.5; mapDesc = hero.mapRuleDesc;
+            }
+            if (mapScore > 0) {
+                appState.allyResults[hero.id].score += mapScore; 
+                appState.allyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${mapDesc ? `: ${mapDesc}` : ""} (+${mapScore.toFixed(1)})</span>`); 
+            }
+
+            let badMapScore = 0; let badMapDesc = "";
+            if (currentMapBase !== "" && (hero.badMapRuleTargets.includes(currentMapBase) || hero.badMapRuleTargets.includes(allyMapRaw))) {
+                badMapScore = 2.0; badMapDesc = hero.badMapRuleDesc;
+            } else if (currentRule !== "" && hero.badMapRuleTargets.includes(currentRule)) {
+                badMapScore = 1.5; badMapDesc = hero.badMapRuleDesc;
+            } else if (allySide !== "" && hero.badMapRuleTargets.includes(allySide)) {
+                badMapScore = 1.5; badMapDesc = hero.badMapRuleDesc;
+            }
+            if (badMapScore > 0) {
+                appState.allyResults[hero.id].score -= badMapScore; 
+                appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${badMapDesc ? `: ${badMapDesc}` : ""} (-${badMapScore.toFixed(1)})</span>`); 
+            }
             
+            // ▼ 味方視点：アンチ/シナジー評価（名指し ＞ タグ）
             activeEnemies.forEach(eId => { 
                 const e = heroesDatabase.find(h => h.id === eId); if (!e) return; 
                 let antiScore = 0; let weakScore = 0;
@@ -335,10 +355,34 @@
                 } 
             });
 
-            // ▼ 敵視点
-            if (enemyEnvTags.length > 0 && hero.mapRuleTargets.some(tag => enemyEnvTags.includes(tag))) { appState.enemyResults[hero.id].score += 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc ? `: ${hero.mapRuleDesc}` : ""} (+1.0)</span>`); }
-            if (enemyEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => enemyEnvTags.includes(tag))) { appState.enemyResults[hero.id].score -= 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc ? `: ${hero.badMapRuleDesc}` : ""} (-1.0)</span>`); }
+            // ▼ 敵視点：マップ環境評価（名指し ＞ ルール）
+            let enemyMapScore = 0; let enemyMapDesc = "";
+            if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(enemyMapRaw))) {
+                enemyMapScore = 2.0; enemyMapDesc = hero.mapRuleDesc;
+            } else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) {
+                enemyMapScore = 1.5; enemyMapDesc = hero.mapRuleDesc;
+            } else if (enemySide !== "" && hero.mapRuleTargets.includes(enemySide)) {
+                enemyMapScore = 1.5; enemyMapDesc = hero.mapRuleDesc;
+            }
+            if (enemyMapScore > 0) {
+                appState.enemyResults[hero.id].score += enemyMapScore; 
+                appState.enemyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${enemyMapDesc ? `: ${enemyMapDesc}` : ""} (+${enemyMapScore.toFixed(1)})</span>`); 
+            }
+
+            let enemyBadMapScore = 0; let enemyBadMapDesc = "";
+            if (currentMapBase !== "" && (hero.badMapRuleTargets.includes(currentMapBase) || hero.badMapRuleTargets.includes(enemyMapRaw))) {
+                enemyBadMapScore = 2.0; enemyBadMapDesc = hero.badMapRuleDesc;
+            } else if (currentRule !== "" && hero.badMapRuleTargets.includes(currentRule)) {
+                enemyBadMapScore = 1.5; enemyBadMapDesc = hero.badMapRuleDesc;
+            } else if (enemySide !== "" && hero.badMapRuleTargets.includes(enemySide)) {
+                enemyBadMapScore = 1.5; enemyBadMapDesc = hero.badMapRuleDesc;
+            }
+            if (enemyBadMapScore > 0) {
+                appState.enemyResults[hero.id].score -= enemyBadMapScore; 
+                appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${enemyBadMapDesc ? `: ${enemyBadMapDesc}` : ""} (-${enemyBadMapScore.toFixed(1)})</span>`); 
+            }
             
+            // ▼ 敵視点：アンチ/シナジー評価
             activeAllies.forEach(aId => { 
                 const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
                 let antiScore = 0; let weakScore = 0;
@@ -389,7 +433,6 @@
         renderDetailsPanel();
     }
 
-    // ★「名指し＞タグ」の優先ルールに従ったアンチピック抽出（Tank1, DPS2）
     function updateSuggests() {
         ['enemy-tank', 'enemy-dps1', 'enemy-dps2', 'enemy-sup1', 'enemy-sup2'].forEach(slotId => {
             const eId = appState.enemies[slotId];
@@ -410,7 +453,7 @@
                 if (eHero.weakTargets.includes(hero.id)) score += 1.5;
                 else if (hero.myTags.some(tag => eHero.weakTargets.includes(tag))) score += 1.0;
                 
-                // 弱点減点も名指し(-1.5)優先、なければタグ(-1.0)
+                // 弱点減点
                 if (hero.weakTargets.includes(eId)) score -= 1.5;
                 else if (eHero.myTags.some(tag => hero.weakTargets.includes(tag))) score -= 1.0;
                 
@@ -420,10 +463,10 @@
                 return { hero, score };
             });
 
-            // トータルスコアがプラス（有利）なキャラだけを候補にする
+            // 有利なキャラのみ抽出
             let validCounters = scoredHeroes.filter(item => item.score > 0);
             
-            // タンク・DPSに分けてスコア順（高い順）に並別変え
+            // タンク・DPSに分けてスコア降順
             let tanks = validCounters.filter(item => item.hero.role === 'tank').sort((a, b) => b.score - a.score);
             let dps = validCounters.filter(item => item.hero.role === 'dps').sort((a, b) => b.score - a.score);
 
@@ -439,7 +482,6 @@
         });
     }
 
-    // ★最適チーム構築AIも「名指し＞タグ」の優先ルールを使用
     function calculateOptimalTeam() {
         if (heroesDatabase.length === 0) return;
 
@@ -458,12 +500,26 @@
         const currentMapRaw = document.getElementById("match-map").value.toLowerCase();
         let currentMapBase = currentMapRaw.replace("_atk", "").replace("_def", "");
         let allySide = currentMapRaw.endsWith("_atk") ? "atk" : (currentMapRaw.endsWith("_def") ? "def" : "");
-        const allyEnvTags = [currentRule, currentMapBase, allySide, currentMapRaw].filter(t => t !== "");
 
         heroesDatabase.forEach(hero => {
             let score = 0;
-            if (allyEnvTags.length > 0 && hero.mapRuleTargets.some(tag => allyEnvTags.includes(tag))) score += 1.0;
-            if (allyEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => allyEnvTags.includes(tag))) score -= 1.0;
+
+            // ★ 最適化AIの環境スコア計算も「名指し＞ルール」優先を徹底（合算なし）
+            if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(currentMapRaw))) {
+                score += 2.0;
+            } else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) {
+                score += 1.5;
+            } else if (allySide !== "" && hero.mapRuleTargets.includes(allySide)) {
+                score += 1.5;
+            }
+
+            if (currentMapBase !== "" && (hero.badMapRuleTargets.includes(currentMapBase) || hero.badMapRuleTargets.includes(currentMapRaw))) {
+                score -= 2.0;
+            } else if (currentRule !== "" && hero.badMapRuleTargets.includes(currentRule)) {
+                score -= 1.5;
+            } else if (allySide !== "" && hero.badMapRuleTargets.includes(allySide)) {
+                score -= 1.5;
+            }
 
             activeEnemies.forEach(eId => {
                 const e = heroesDatabase.find(h => h.id === eId);
@@ -505,7 +561,6 @@
                             for (let a of comp) {
                                 for (let b of comp) {
                                     if (a.id === b.id) continue;
-                                    // シナジーも名指し優先(1.0)、なければタグ(0.5)
                                     if (a.synergyTargets.includes(b.id)) {
                                         score += 1.0;
                                     } else if (b.myTags.some(tag => a.synergyTargets.includes(tag))) {

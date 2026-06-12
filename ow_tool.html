@@ -55,6 +55,11 @@
         .slot-support .slot-image-box { border-bottom: 3px solid var(--accent-support); }
         .slot-name { font-size: 0.65rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; color: var(--text-sub); }
 
+        /* 敵アンチピック用のミニサジェスト枠 */
+        .suggest-box { display: flex; gap: 3px; margin-top: 5px; height: 20px; min-height: 20px; justify-content: center; width: 100%; }
+        .suggest-icon { width: 20px; height: 20px; border-radius: 4px; background-color: var(--bg-color); overflow: hidden; border: 1px solid var(--panel-sub); }
+        .suggest-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
         .optimal-team-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 12px; border: 1px dashed var(--accent-ally); display: flex; align-items: center; justify-content: center; min-height: 70px; }
 
         .score-badge { padding: 2px 6px; border-radius: 8px; font-weight: bold; border: 2px solid var(--bg-color); box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
@@ -119,7 +124,6 @@
         </div>
     </div>
 
-    <!-- 味方チームを上に配置 -->
     <div>
         <div class="team-title-row">
             <div class="section-title title-ally">味方チーム (Ally)</div>
@@ -134,22 +138,21 @@
         </div>
     </div>
 
-    <!-- 敵チームを下に配置 -->
     <div>
         <div class="team-title-row">
             <div class="section-title title-enemy">敵チーム (Enemy)</div>
             <div id="enemy-team-score" class="score-badge team-score-badge">0.0</div>
         </div>
         <div class="team-row">
-            <div class="slot-wrapper slot-tank" id="wrap-enemy-tank" onclick="selectFrame('enemy-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-tank', 'tank')"><div class="slot-empty-icon" id="img-enemy-tank">T</div></div><div class="slot-name" id="name-enemy-tank">未選択</div><div id="score-enemy-tank" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps1" onclick="selectFrame('enemy-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps1', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps1">D</div></div><div class="slot-name" id="name-enemy-dps1">未選択</div><div id="score-enemy-dps1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps2" onclick="selectFrame('enemy-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps2', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps2">D</div></div><div class="slot-name" id="name-enemy-dps2">未選択</div><div id="score-enemy-dps2" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-enemy-sup1" onclick="selectFrame('enemy-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup1', 'support')"><div class="slot-empty-icon" id="img-enemy-sup1">S</div></div><div class="slot-name" id="name-enemy-sup1">未選択</div><div id="score-enemy-sup1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-enemy-sup2" onclick="selectFrame('enemy-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup2', 'support')"><div class="slot-empty-icon" id="img-enemy-sup2">S</div></div><div class="slot-name" id="name-enemy-sup2">未選択</div><div id="score-enemy-sup2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-tank" id="wrap-enemy-tank" onclick="selectFrame('enemy-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-tank', 'tank')"><div class="slot-empty-icon" id="img-enemy-tank">T</div></div><div class="slot-name" id="name-enemy-tank">未選択</div><div class="suggest-box" id="suggest-enemy-tank"></div><div id="score-enemy-tank" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps1" onclick="selectFrame('enemy-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps1', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps1">D</div></div><div class="slot-name" id="name-enemy-dps1">未選択</div><div class="suggest-box" id="suggest-enemy-dps1"></div><div id="score-enemy-dps1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps2" onclick="selectFrame('enemy-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps2', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps2">D</div></div><div class="slot-name" id="name-enemy-dps2">未選択</div><div class="suggest-box" id="suggest-enemy-dps2"></div><div id="score-enemy-dps2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-enemy-sup1" onclick="selectFrame('enemy-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup1', 'support')"><div class="slot-empty-icon" id="img-enemy-sup1">S</div></div><div class="slot-name" id="name-enemy-sup1">未選択</div><div class="suggest-box" id="suggest-enemy-sup1"></div><div id="score-enemy-sup1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-enemy-sup2" onclick="selectFrame('enemy-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup2', 'support')"><div class="slot-empty-icon" id="img-enemy-sup2">S</div></div><div class="slot-name" id="name-enemy-sup2">未選択</div><div class="suggest-box" id="suggest-enemy-sup2"></div><div id="score-enemy-sup2" class="score-badge slot-score"></div></div>
         </div>
+        <div style="font-size:0.65rem; color:var(--text-sub); text-align:right; margin-top:5px;">※アイコン下：個別の対策キャラ（上位3体）</div>
     </div>
 
-    <!-- 5人合算の最適チーム構成枠 -->
     <div>
         <div class="section-title standalone-title title-ally">💡 最適チーム構成 (AI推奨)</div>
         <div id="optimal-team-box" style="display: flex; flex-direction: column; gap: 10px;">
@@ -198,6 +201,10 @@
             document.getElementById(`name-${slotId}`).innerText = "未選択";
             document.getElementById(`score-${slotId}`).classList.remove('is-visible');
             document.getElementById(`wrap-${slotId}`).classList.remove('is-selected');
+            
+            // 敵サジェストのクリア
+            const sug = document.getElementById(`suggest-${slotId}`);
+            if (sug) sug.innerHTML = "";
         });
         document.getElementById("optimal-team-box").innerHTML = `
             <div class="optimal-team-panel">
@@ -315,17 +322,41 @@
         });
 
         updateScoresUI(); 
+        updateSuggests(); // 敵のみアンチピックを表示
         calculateOptimalTeam();
         renderDetailsPanel();
     }
 
-    // ★完全改修: 1つの最強構成(5人)だけをズバッと出力する
+    // ★敵スロットの直下にアンチピックを3体サジェストするロジック
+    function updateSuggests() {
+        ['enemy-tank', 'enemy-dps1', 'enemy-dps2', 'enemy-sup1', 'enemy-sup2'].forEach(slotId => {
+            const eId = appState.enemies[slotId];
+            const suggestBox = document.getElementById(`suggest-${slotId}`);
+            suggestBox.innerHTML = '';
+            if (!eId) return;
+
+            const eHero = heroesDatabase.find(h => h.id === eId);
+            if (!eHero) return;
+
+            let candidates = heroesDatabase.map(hero => {
+                let score = 0;
+                if (hero.antiTargets.includes(eId) || eHero.myTags.some(tag => hero.antiTargets.includes(tag))) { score += 1.5; }
+                if (hero.weakTargets.includes(eId) || eHero.myTags.some(tag => hero.weakTargets.includes(tag))) { score -= 1.5; }
+                return { hero, score };
+            }).filter(item => item.score > 0);
+
+            candidates.sort((a, b) => b.score - a.score);
+            candidates.slice(0, 3).forEach(item => {
+                suggestBox.innerHTML += `<div class="suggest-icon"><img src="images01/${item.hero.id}.png" onerror="this.style.display='none'"></div>`;
+            });
+        });
+    }
+
     function calculateOptimalTeam() {
         if (heroesDatabase.length === 0) return;
 
         const activeEnemies = Object.values(appState.enemies).filter(v => v !== "");
 
-        // 何も入力されていない場合は待機メッセージ
         if (activeEnemies.length === 0 && Object.values(appState.allies).filter(v => v !== "").length === 0 && document.getElementById("match-map").value === "") {
             document.getElementById('optimal-team-box').innerHTML = `
                 <div class="optimal-team-panel">

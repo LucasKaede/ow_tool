@@ -46,14 +46,14 @@
         .scan-btn:disabled, .scan-btn-sub:disabled { opacity: 0.5; cursor: not-allowed; }
         .scan-note { font-size: 0.75rem; color: var(--text-sub); margin-top: 10px; line-height: 1.4; }
         
-        /* ★修正：カメラガイド枠を全体サイズに変更 */
         .camera-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
         .camera-overlay.is-active { display: flex; }
         .camera-video-container { position: relative; flex-grow: 1; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         #camera-video { position: absolute; min-width: 100%; min-height: 100%; object-fit: cover; }
         
-        .camera-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; height: 60%; border: 3px dashed #ec4899; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; pointer-events: none; }
-        .camera-guide::after { content: 'モニター画面全体をこの枠に収める'; position: absolute; top: -30px; color: #fff; font-size: 1rem; font-weight: bold; width: 100%; text-align: center; white-space: nowrap; text-shadow: 0 2px 4px #000; }
+        /* ★修正：ガイド枠を常に16:9の横長に固定し、横向き撮影を促す */
+        .camera-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90vw; max-width: 800px; aspect-ratio: 16 / 9; border: 3px dashed #ec4899; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; pointer-events: none; }
+        .camera-guide::after { content: 'スマホを横向きに倒し、モニター全体を枠に入れる'; position: absolute; top: -30px; color: #fff; font-size: 1rem; font-weight: bold; width: 100%; text-align: center; white-space: nowrap; text-shadow: 0 2px 4px #000; }
         
         .camera-controls { padding: 20px; background: #000; display: flex; justify-content: space-between; gap: 15px; padding-bottom: 40px; }
         .cam-btn-cancel { flex: 1; padding: 15px; border-radius: 10px; background: var(--panel-sub); color: #fff; border: none; font-weight: bold; font-size: 1rem; }
@@ -125,7 +125,7 @@
             <input type="file" id="image-upload" accept="image/*" style="display: none;" onchange="processFileImage(event)">
             <button id="scan-live-btn" class="scan-btn" disabled onclick="startLiveCamera()">📷 リアルタイム スキャン</button>
             <button id="scan-file-btn" class="scan-btn-sub" disabled onclick="document.getElementById('image-upload').click()">📁 保存した写真から読み込む</button>
-            <div class="scan-note">スコアボード全体をカメラで写して敵キャラを自動検出します。</div>
+            <div class="scan-note">スマホを【横向き】にしてスコアボードを写してください。</div>
             <canvas id="hidden-canvas" style="display:none;"></canvas>
             <canvas id="template-canvas" style="display:none;"></canvas>
         </div>
@@ -246,7 +246,9 @@
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         stopLiveCamera();
-        setTimeout(() => { analyzeImageFromCanvas(canvas); }, 50);
+        
+        // 処理が重くなるため、少しディレイを入れてUIを更新させる
+        setTimeout(() => { analyzeImageFromCanvas(canvas); }, 100);
     }
 
     async function processFileImage(e) {
@@ -268,14 +270,14 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
             
-            setTimeout(() => { analyzeImageFromCanvas(canvas); }, 50);
+            setTimeout(() => { analyzeImageFromCanvas(canvas); }, 100);
         };
     }
 
-    // ★修正：マルチスケール＆推測サイズ探索
+    // ★大幅修正：8パターンのサイズ探索と閾値の緩和
     function analyzeImageFromCanvas(sourceCanvas) {
         try {
-            document.getElementById('scan-live-btn').innerText = "🔄 解析中...";
+            document.getElementById('scan-live-btn').innerText = "🔄 解析中... (数秒かかります)";
             document.getElementById('scan-live-btn').disabled = true;
             document.getElementById('scan-file-btn').disabled = true;
 
@@ -283,19 +285,25 @@
             let srcGray = new cv.Mat();
             cv.cvtColor(src, srcGray, cv.COLOR_RGBA2GRAY);
             
-            const MATCH_THRESHOLD = 0.55; 
+            const MATCH_THRESHOLD = 0.50; // モアレを考慮し閾値をさらに緩和
             let foundTanks = [], foundDps = [], foundSupports = [];
             let maxMatchScore = 0;
 
             const templateCanvas = document.getElementById('template-canvas');
             const ctx = templateCanvas.getContext('2d', { willReadFrequently: true });
 
-            // 画面の横幅からアイコンのサイズを推測 (約5.5%, 6.5%, 7.5%)
             const cWidth = sourceCanvas.width;
+            
+            // 4.5% 〜 8.0% まで、0.5%刻みで8パターン総当たり
             const expectedSizes = [
+                Math.round(cWidth * 0.045),
+                Math.round(cWidth * 0.050),
                 Math.round(cWidth * 0.055),
+                Math.round(cWidth * 0.060),
                 Math.round(cWidth * 0.065),
-                Math.round(cWidth * 0.075)
+                Math.round(cWidth * 0.070),
+                Math.round(cWidth * 0.075),
+                Math.round(cWidth * 0.080)
             ];
 
             heroesDatabase.forEach(hero => {
@@ -303,10 +311,8 @@
                 templImg.src = `images/${hero.id}.png`; 
                 try {
                     if(!templImg.width) return;
-                    
                     let bestHeroScore = 0;
 
-                    // 推測した3つのサイズでマッチングを試行
                     expectedSizes.forEach(targetSize => {
                         templateCanvas.width = targetSize;
                         templateCanvas.height = targetSize;
@@ -353,7 +359,7 @@
             if (totalFound > 0) {
                 alert(`画像解析が完了しました！\n（検出: タンク${foundTanks.length}体, DPS${foundDps.length}体, サポ${foundSupports.length}体）`);
             } else {
-                alert(`解析完了しましたが、キャラが見つかりませんでした。\n\n【最高一致スコア: ${maxMatchScore.toFixed(2)}】\n（※0.55以上で検出されます）\n\n・モニター画面全体が枠に収まるように距離を調整してください。\n・光の反射が入らないように撮影してください。`);
+                alert(`キャラが見つかりませんでした。\n\n【最高一致スコア: ${maxMatchScore.toFixed(2)}】\n（※0.50以上で検出されます）\n\n・スマホを【横向き】にして、画面いっぱいにモニターを映してください。\n・imagesフォルダの画像が四角いアイコンであることを確認してください。`);
             }
 
         } catch (error) {

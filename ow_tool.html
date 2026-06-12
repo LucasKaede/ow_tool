@@ -55,6 +55,11 @@
         .slot-support .slot-image-box { border-bottom: 3px solid var(--accent-support); }
         .slot-name { font-size: 0.65rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; color: var(--text-sub); }
 
+        /* ▼ 新規追加: アンチピック・シナジーのサジェスト枠 */
+        .suggest-box { display: flex; gap: 3px; margin-top: 5px; height: 20px; min-height: 20px; justify-content: center; width: 100%; }
+        .suggest-icon { width: 20px; height: 20px; border-radius: 4px; background-color: var(--bg-color); overflow: hidden; border: 1px solid var(--panel-sub); }
+        .suggest-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
         .score-badge { padding: 2px 6px; border-radius: 8px; font-weight: bold; border: 2px solid var(--bg-color); box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
         .score-plus { background-color: #065f46; color: #34d399; } 
         .score-minus { background-color: #991b1b; color: #f87171; } 
@@ -86,10 +91,8 @@
         .modal-item-info { width: 100%; font-weight: bold; font-size: 0.65rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
         .modal-item .score-badge { position: absolute; top: -8px; right: -6px; font-size: 0.7rem; }
         .clear-btn { grid-column: 1 / -1; flex-direction: row; justify-content: center; background-color: #3f2c33; color: #f43f5e; font-weight: bold; padding: 14px; margin-bottom: 5px; }
-        
-        /* スキャンUI関連のCSSは一旦残していますが、HTML側で非表示になっています */
     </style>
-    </head>
+</head>
 <body>
 
 <header>
@@ -101,7 +104,6 @@
 </header>
 
 <div class="container">
-    
     <div>
         <div class="section-title standalone-title title-env">マップ ＆ ルール</div>
         <div class="env-row">
@@ -116,12 +118,13 @@
             <div id="enemy-team-score" class="score-badge team-score-badge">0.0</div>
         </div>
         <div class="team-row">
-            <div class="slot-wrapper slot-tank" id="wrap-enemy-tank" onclick="selectFrame('enemy-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-tank', 'tank')"><div class="slot-empty-icon" id="img-enemy-tank">T</div></div><div class="slot-name" id="name-enemy-tank">未選択</div><div id="score-enemy-tank" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps1" onclick="selectFrame('enemy-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps1', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps1">D</div></div><div class="slot-name" id="name-enemy-dps1">未選択</div><div id="score-enemy-dps1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps2" onclick="selectFrame('enemy-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps2', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps2">D</div></div><div class="slot-name" id="name-enemy-dps2">未選択</div><div id="score-enemy-dps2" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-enemy-sup1" onclick="selectFrame('enemy-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup1', 'support')"><div class="slot-empty-icon" id="img-enemy-sup1">S</div></div><div class="slot-name" id="name-enemy-sup1">未選択</div><div id="score-enemy-sup1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-enemy-sup2" onclick="selectFrame('enemy-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup2', 'support')"><div class="slot-empty-icon" id="img-enemy-sup2">S</div></div><div class="slot-name" id="name-enemy-sup2">未選択</div><div id="score-enemy-sup2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-tank" id="wrap-enemy-tank" onclick="selectFrame('enemy-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-tank', 'tank')"><div class="slot-empty-icon" id="img-enemy-tank">T</div></div><div class="slot-name" id="name-enemy-tank">未選択</div><div class="suggest-box" id="suggest-enemy-tank"></div><div id="score-enemy-tank" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps1" onclick="selectFrame('enemy-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps1', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps1">D</div></div><div class="slot-name" id="name-enemy-dps1">未選択</div><div class="suggest-box" id="suggest-enemy-dps1"></div><div id="score-enemy-dps1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps2" onclick="selectFrame('enemy-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps2', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps2">D</div></div><div class="slot-name" id="name-enemy-dps2">未選択</div><div class="suggest-box" id="suggest-enemy-dps2"></div><div id="score-enemy-dps2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-enemy-sup1" onclick="selectFrame('enemy-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup1', 'support')"><div class="slot-empty-icon" id="img-enemy-sup1">S</div></div><div class="slot-name" id="name-enemy-sup1">未選択</div><div class="suggest-box" id="suggest-enemy-sup1"></div><div id="score-enemy-sup1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-enemy-sup2" onclick="selectFrame('enemy-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup2', 'support')"><div class="slot-empty-icon" id="img-enemy-sup2">S</div></div><div class="slot-name" id="name-enemy-sup2">未選択</div><div class="suggest-box" id="suggest-enemy-sup2"></div><div id="score-enemy-sup2" class="score-badge slot-score"></div></div>
         </div>
+        <div style="font-size:0.65rem; color:var(--text-sub); text-align:right; margin-top:5px;">※アイコン下：おすすめの対策キャラ</div>
     </div>
 
     <div>
@@ -130,12 +133,13 @@
             <div id="ally-team-score" class="score-badge team-score-badge">0.0</div>
         </div>
         <div class="team-row">
-            <div class="slot-wrapper slot-tank" id="wrap-ally-tank" onclick="selectFrame('ally-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-tank', 'tank')"><div class="slot-empty-icon" id="img-ally-tank">T</div></div><div class="slot-name" id="name-ally-tank">未選択</div><div id="score-ally-tank" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-ally-dps1" onclick="selectFrame('ally-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-dps1', 'dps')"><div class="slot-empty-icon" id="img-ally-dps1">D</div></div><div class="slot-name" id="name-ally-dps1">未選択</div><div id="score-ally-dps1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-ally-dps2" onclick="selectFrame('ally-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-dps2', 'dps')"><div class="slot-empty-icon" id="img-ally-dps2">D</div></div><div class="slot-name" id="name-ally-dps2">未選択</div><div id="score-ally-dps2" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-ally-sup1" onclick="selectFrame('ally-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-sup1', 'support')"><div class="slot-empty-icon" id="img-ally-sup1">S</div></div><div class="slot-name" id="name-ally-sup1">未選択</div><div id="score-ally-sup1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-ally-sup2" onclick="selectFrame('ally-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-sup2', 'support')"><div class="slot-empty-icon" id="img-ally-sup2">S</div></div><div class="slot-name" id="name-ally-sup2">未選択</div><div id="score-ally-sup2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-tank" id="wrap-ally-tank" onclick="selectFrame('ally-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-tank', 'tank')"><div class="slot-empty-icon" id="img-ally-tank">T</div></div><div class="slot-name" id="name-ally-tank">未選択</div><div class="suggest-box" id="suggest-ally-tank"></div><div id="score-ally-tank" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-ally-dps1" onclick="selectFrame('ally-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-dps1', 'dps')"><div class="slot-empty-icon" id="img-ally-dps1">D</div></div><div class="slot-name" id="name-ally-dps1">未選択</div><div class="suggest-box" id="suggest-ally-dps1"></div><div id="score-ally-dps1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-ally-dps2" onclick="selectFrame('ally-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-dps2', 'dps')"><div class="slot-empty-icon" id="img-ally-dps2">D</div></div><div class="slot-name" id="name-ally-dps2">未選択</div><div class="suggest-box" id="suggest-ally-dps2"></div><div id="score-ally-dps2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-ally-sup1" onclick="selectFrame('ally-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-sup1', 'support')"><div class="slot-empty-icon" id="img-ally-sup1">S</div></div><div class="slot-name" id="name-ally-sup1">未選択</div><div class="suggest-box" id="suggest-ally-sup1"></div><div id="score-ally-sup1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-ally-sup2" onclick="selectFrame('ally-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-sup2', 'support')"><div class="slot-empty-icon" id="img-ally-sup2">S</div></div><div class="slot-name" id="name-ally-sup2">未選択</div><div class="suggest-box" id="suggest-ally-sup2"></div><div id="score-ally-sup2" class="score-badge slot-score"></div></div>
         </div>
+        <div style="font-size:0.65rem; color:var(--text-sub); text-align:right; margin-top:5px;">※アイコン下：相性の良い味方キャラ</div>
     </div>
 
     <div>
@@ -154,7 +158,6 @@
 </div>
 
 <script>
-    // ⚠️ CSV公開URL
     const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHb34RcBctjEcBeNrixnFu_sfbF7B2sAjFkWVIHcqKcLhmurraDyS2thmJbGTlrF3WNUom2go4P66X/pub?output=csv";
 
     const appState = {
@@ -255,7 +258,65 @@
             activeEnemies.forEach(eId => { if(eId === hero.id) return; const e = heroesDatabase.find(h => h.id === eId); if (!e) return; if (hero.synergyTargets.includes(eId) || e.myTags.some(tag => hero.synergyTargets.includes(tag))) { appState.enemyResults[hero.id].score += 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-synergy">【敵同士相性】with ${e.name}${hero.synergyDesc ? `: ${hero.synergyDesc}` : ""} (+1.0)</span>`); } });
         });
 
-        updateScoresUI(); renderDetailsPanel();
+        updateScoresUI(); 
+        updateSuggests(); // ★追加: サジェスト枠の更新
+        renderDetailsPanel();
+    }
+
+    // ★新規追加: アンチピック・シナジーピックの更新ロジック
+    function updateSuggests() {
+        // 敵枠の下にアンチピックを3体表示
+        ['enemy-tank', 'enemy-dps1', 'enemy-dps2', 'enemy-sup1', 'enemy-sup2'].forEach(slotId => {
+            const eId = appState.enemies[slotId];
+            const suggestBox = document.getElementById(`suggest-${slotId}`);
+            suggestBox.innerHTML = '';
+            if (!eId) return;
+
+            const eHero = heroesDatabase.find(h => h.id === eId);
+            if (!eHero) return;
+
+            let candidates = heroesDatabase.map(hero => {
+                let score = 0;
+                // 自分が敵に対して有利か
+                if (hero.antiTargets.includes(eId) || eHero.myTags.some(tag => hero.antiTargets.includes(tag))) { score += 1.5; }
+                // 敵が自分に対して有利か（マイナス評価）
+                if (hero.weakTargets.includes(eId) || eHero.myTags.some(tag => hero.weakTargets.includes(tag))) { score -= 1.5; }
+                return { hero, score };
+            }).filter(item => item.score > 0);
+
+            candidates.sort((a, b) => b.score - a.score);
+            const top3 = candidates.slice(0, 3);
+
+            top3.forEach(item => {
+                suggestBox.innerHTML += `<div class="suggest-icon"><img src="images01/${item.hero.id}.png" onerror="this.style.display='none'"></div>`;
+            });
+        });
+
+        // 味方枠の下にシナジー（相性の良い）ピックを3体表示
+        ['ally-tank', 'ally-dps1', 'ally-dps2', 'ally-sup1', 'ally-sup2'].forEach(slotId => {
+            const aId = appState.allies[slotId];
+            const suggestBox = document.getElementById(`suggest-${slotId}`);
+            suggestBox.innerHTML = '';
+            if (!aId) return;
+
+            const aHero = heroesDatabase.find(h => h.id === aId);
+            if (!aHero) return;
+
+            let candidates = heroesDatabase.map(hero => {
+                if (hero.id === aId) return { hero, score: 0 };
+                let score = 0;
+                // シナジーがあるか
+                if (hero.synergyTargets.includes(aId) || aHero.myTags.some(tag => hero.synergyTargets.includes(tag))) { score += 1.0; }
+                return { hero, score };
+            }).filter(item => item.score > 0);
+
+            candidates.sort((a, b) => b.score - a.score);
+            const top3 = candidates.slice(0, 3);
+
+            top3.forEach(item => {
+                suggestBox.innerHTML += `<div class="suggest-icon"><img src="images01/${item.hero.id}.png" onerror="this.style.display='none'"></div>`;
+            });
+        });
     }
 
     function updateScoresUI() {
@@ -321,7 +382,6 @@
         
         candidates.forEach(item => {
             const h = item.hero; 
-            // ★変更：ディレクトリを images01/ に変更
             const iconPath = `images01/${h.id}.png`;
             let badgeClass = "score-zero"; let scoreText = item.score > 0 ? `+${item.score.toFixed(1)}` : item.score.toFixed(1); 
             if (item.score > 0) badgeClass = "score-plus"; if (item.score < 0) badgeClass = "score-minus"; 
@@ -336,7 +396,6 @@
         const imgBox = document.getElementById(`img-${currentModalSlotId}`); const nameBox = document.getElementById(`name-${currentModalSlotId}`);
         if (heroId) { 
             const h = heroesDatabase.find(x => x.id === heroId); 
-            // ★変更：ディレクトリを images01/ に変更
             imgBox.innerHTML = `<img src="images01/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; 
             nameBox.innerText = h.name; 
         } else { 

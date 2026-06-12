@@ -40,24 +40,6 @@
         .title-scan::before { background-color: var(--accent-scan); }
         .standalone-title { margin-bottom: 10px; }
 
-        .scan-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 15px; border: 1px dashed var(--accent-scan); text-align: center; }
-        .scan-btn { background-color: var(--accent-scan); color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; width: 100%; font-size: 1rem; transition: 0.3s; margin-bottom: 10px; cursor: pointer; }
-        .scan-btn-sub { background-color: var(--panel-sub); color: var(--text-main); border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; width: 100%; font-size: 0.9rem; cursor: pointer; }
-        .scan-btn:disabled, .scan-btn-sub:disabled { opacity: 0.5; cursor: not-allowed; }
-        .scan-note { font-size: 0.75rem; color: var(--text-sub); margin-top: 10px; line-height: 1.4; }
-        
-        .camera-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
-        .camera-overlay.is-active { display: flex; }
-        .camera-video-container { position: relative; flex-grow: 1; overflow: hidden; display: flex; justify-content: center; align-items: center; }
-        #camera-video { position: absolute; min-width: 100%; min-height: 100%; object-fit: cover; }
-        
-        .camera-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90vw; max-width: 800px; aspect-ratio: 16 / 9; border: 3px dashed #ec4899; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; pointer-events: none; }
-        .camera-guide::after { content: 'スマホを横向きに倒し、モニター全体を枠に入れる'; position: absolute; top: -30px; color: #fff; font-size: 1rem; font-weight: bold; width: 100%; text-align: center; white-space: nowrap; text-shadow: 0 2px 4px #000; }
-        
-        .camera-controls { padding: 20px; background: #000; display: flex; justify-content: space-between; gap: 15px; padding-bottom: 40px; }
-        .cam-btn-cancel { flex: 1; padding: 15px; border-radius: 10px; background: var(--panel-sub); color: #fff; border: none; font-weight: bold; font-size: 1rem; }
-        .cam-btn-shoot { flex: 2; padding: 15px; border-radius: 10px; background: var(--accent-scan); color: #fff; border: none; font-weight: bold; font-size: 1.1rem; }
-
         .env-row { display: flex; gap: 10px; }
         .env-select-wrap { flex: 1; background-color: var(--panel-bg); border-radius: 8px; border: 1px solid var(--panel-sub); overflow: hidden; }
         .env-select-wrap select { width: 100%; background: transparent; color: #fff; border: none; padding: 12px; font-size: 0.9rem; outline: none; appearance: none; cursor: pointer; }
@@ -104,9 +86,10 @@
         .modal-item-info { width: 100%; font-weight: bold; font-size: 0.65rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
         .modal-item .score-badge { position: absolute; top: -8px; right: -6px; font-size: 0.7rem; }
         .clear-btn { grid-column: 1 / -1; flex-direction: row; justify-content: center; background-color: #3f2c33; color: #f43f5e; font-weight: bold; padding: 14px; margin-bottom: 5px; }
+        
+        /* スキャンUI関連のCSSは一旦残していますが、HTML側で非表示になっています */
     </style>
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
-</head>
+    </head>
 <body>
 
 <header>
@@ -118,18 +101,7 @@
 </header>
 
 <div class="container">
-    <div>
-        <div class="section-title standalone-title title-scan">📷 画像から自動編成 (Beta)</div>
-        <div class="scan-panel">
-            <input type="file" id="image-upload" accept="image/*" style="display: none;" onchange="processFileImage(event)">
-            <button id="scan-live-btn" class="scan-btn" disabled onclick="startLiveCamera()">📷 リアルタイム スキャン</button>
-            <button id="scan-file-btn" class="scan-btn-sub" disabled onclick="document.getElementById('image-upload').click()">📁 保存した写真から読み込む</button>
-            <div class="scan-note">スマホを【横向き】にしてスコアボードを写してください。</div>
-            <canvas id="hidden-canvas" style="display:none;"></canvas>
-            <canvas id="template-canvas" style="display:none;"></canvas>
-        </div>
-    </div>
-
+    
     <div>
         <div class="section-title standalone-title title-env">マップ ＆ ルール</div>
         <div class="env-row">
@@ -174,17 +146,6 @@
     </div>
 </div>
 
-<div class="camera-overlay" id="camera-overlay">
-    <div class="camera-video-container">
-        <video id="camera-video" autoplay playsinline></video>
-        <div class="camera-guide"></div>
-    </div>
-    <div class="camera-controls">
-        <button class="cam-btn-cancel" onclick="stopLiveCamera()">キャンセル</button>
-        <button class="cam-btn-shoot" onclick="captureLiveCamera()">スキャン実行</button>
-    </div>
-</div>
-
 <div class="modal-overlay" id="hero-modal" onclick="closeModal(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
         <div class="modal-header"><div class="modal-title" id="modal-title">キャラクターを選択</div><button class="modal-close" onclick="closeModal()">&times;</button></div>
@@ -203,186 +164,6 @@
     };
 
     let heroesDatabase = [];
-    let isCvReady = false;
-    let cameraStream = null;
-
-    function onOpenCvReady() {
-        isCvReady = true;
-        document.getElementById('scan-live-btn').disabled = false;
-        document.getElementById('scan-file-btn').disabled = false;
-    }
-
-    async function startLiveCamera() {
-        if (!isCvReady || heroesDatabase.length === 0) return;
-        const video = document.getElementById('camera-video');
-        try {
-            cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
-            });
-            video.srcObject = cameraStream;
-            document.getElementById('camera-overlay').classList.add('is-active');
-        } catch (err) {
-            alert("カメラの起動に失敗しました。\n・ブラウザの権限が許可されているか\n・「https」か地球儀マーク(TrebEdit)で開いているか確認してください。");
-        }
-    }
-
-    function stopLiveCamera() {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraStream = null;
-        }
-        document.getElementById('camera-overlay').classList.remove('is-active');
-    }
-
-    function captureLiveCamera() {
-        const video = document.getElementById('camera-video');
-        const canvas = document.getElementById('hidden-canvas');
-        if(!video.videoWidth) return;
-        
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        stopLiveCamera();
-        
-        setTimeout(() => { analyzeImageFromCanvas(canvas); }, 100);
-    }
-
-    async function processFileImage(e) {
-        if (!isCvReady || heroesDatabase.length === 0) return;
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const imgUrl = URL.createObjectURL(file);
-        const imgElement = new Image();
-        imgElement.src = imgUrl;
-
-        imgElement.onload = async () => {
-            const canvas = document.getElementById('hidden-canvas');
-            const MAX_WIDTH = 1200;
-            let scale = 1;
-            if (imgElement.width > MAX_WIDTH) { scale = MAX_WIDTH / imgElement.width; }
-            canvas.width = imgElement.width * scale;
-            canvas.height = imgElement.height * scale;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
-            
-            setTimeout(() => { analyzeImageFromCanvas(canvas); }, 100);
-        };
-    }
-
-    // ★透過マスクを適用した新解析ロジック
-    function analyzeImageFromCanvas(sourceCanvas) {
-        try {
-            document.getElementById('scan-live-btn').innerText = "🔄 解析中... (数秒かかります)";
-            document.getElementById('scan-live-btn').disabled = true;
-            document.getElementById('scan-file-btn').disabled = true;
-
-            let src = cv.imread(sourceCanvas);
-            let srcGray = new cv.Mat();
-            cv.cvtColor(src, srcGray, cv.COLOR_RGBA2GRAY);
-            
-            const MATCH_THRESHOLD = 0.55; 
-            let foundTanks = [], foundDps = [], foundSupports = [];
-            let maxMatchScore = 0;
-
-            const templateCanvas = document.getElementById('template-canvas');
-            const ctx = templateCanvas.getContext('2d', { willReadFrequently: true });
-
-            const cWidth = sourceCanvas.width;
-            
-            const expectedSizes = [
-                Math.round(cWidth * 0.045), Math.round(cWidth * 0.050), Math.round(cWidth * 0.055),
-                Math.round(cWidth * 0.060), Math.round(cWidth * 0.065), Math.round(cWidth * 0.070),
-                Math.round(cWidth * 0.075), Math.round(cWidth * 0.080)
-            ];
-
-            heroesDatabase.forEach(hero => {
-                const templImg = new Image();
-                templImg.src = `images/${hero.id}.png`; 
-                try {
-                    if(!templImg.width) return;
-                    let bestHeroScore = 0;
-
-                    expectedSizes.forEach(targetSize => {
-                        // 1. Canvasをきれいにクリアする（以前の画像が残らないように）
-                        ctx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
-                        templateCanvas.width = targetSize;
-                        templateCanvas.height = targetSize;
-                        ctx.drawImage(templImg, 0, 0, targetSize, targetSize);
-
-                        // 2. テンプレート画像を読み込み
-                        let templ = cv.imread(templateCanvas);
-                        let templGray = new cv.Mat();
-                        cv.cvtColor(templ, templGray, cv.COLOR_RGBA2GRAY);
-
-                        // 3. ★アルファチャンネル（透過度）を抽出して「マスク」を作成
-                        let rgbaPlanes = new cv.MatVector();
-                        cv.split(templ, rgbaPlanes);
-                        let alphaMask = rgbaPlanes.get(3);
-
-                        let dst = new cv.Mat();
-                        let emptyMask = new cv.Mat();
-
-                        // 4. ★透過部分を無視してマッチング実行
-                        cv.matchTemplate(srcGray, templGray, dst, cv.TM_CCOEFF_NORMED, alphaMask);
-                        let result = cv.minMaxLoc(dst, emptyMask);
-
-                        if (result.maxVal > bestHeroScore) bestHeroScore = result.maxVal;
-
-                        templ.delete(); templGray.delete(); rgbaPlanes.delete(); alphaMask.delete(); dst.delete(); emptyMask.delete();
-                    });
-
-                    if (bestHeroScore > maxMatchScore) maxMatchScore = bestHeroScore;
-
-                    if (bestHeroScore >= MATCH_THRESHOLD) {
-                        if (hero.role === 'tank' && !foundTanks.includes(hero.id)) foundTanks.push(hero.id);
-                        if (hero.role === 'dps' && !foundDps.includes(hero.id)) foundDps.push(hero.id);
-                        if (hero.role === 'support' && !foundSupports.includes(hero.id)) foundSupports.push(hero.id);
-                    }
-                } catch(err) {}
-            });
-            src.delete(); srcGray.delete();
-
-            if (foundTanks[0]) updateSlotDirect('enemy-tank', foundTanks[0]);
-            if (foundDps[0]) updateSlotDirect('enemy-dps1', foundDps[0]);
-            if (foundDps[1]) updateSlotDirect('enemy-dps2', foundDps[1]);
-            if (foundSupports[0]) updateSlotDirect('enemy-sup1', foundSupports[0]);
-            if (foundSupports[1]) updateSlotDirect('enemy-sup2', foundSupports[1]);
-
-            updateSimulation();
-
-            document.getElementById('scan-live-btn').innerText = "📷 リアルタイム スキャン";
-            document.getElementById('scan-live-btn').disabled = false;
-            document.getElementById('scan-file-btn').disabled = false;
-            
-            const totalFound = foundTanks.length + foundDps.length + foundSupports.length;
-            if (totalFound > 0) {
-                alert(`画像解析が完了しました！\n（検出: タンク${foundTanks.length}体, DPS${foundDps.length}体, サポ${foundSupports.length}体）`);
-            } else {
-                alert(`キャラが見つかりませんでした。\n\n【最高一致スコア: ${maxMatchScore.toFixed(2)}】\n（※0.55以上で検出されます）\n\n・スマホを【横向き】にして、画面いっぱいにモニターを映してください。\n・imagesフォルダの画像が四角いアイコンであることを確認してください。`);
-            }
-
-        } catch (error) {
-            console.error("OpenCV Error:", error);
-            document.getElementById('scan-live-btn').innerText = "📷 リアルタイム スキャン";
-            document.getElementById('scan-live-btn').disabled = false;
-            document.getElementById('scan-file-btn').disabled = false;
-            alert("解析中にエラーが発生しました。");
-        }
-    }
-
-    function updateSlotDirect(slotId, heroId) {
-        appState.enemies[slotId] = heroId;
-        const imgBox = document.getElementById(`img-${slotId}`);
-        const nameBox = document.getElementById(`name-${slotId}`);
-        const h = heroesDatabase.find(x => x.id === heroId);
-        if(h) {
-            imgBox.innerHTML = `<img src="images/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`;
-            nameBox.innerText = h.name;
-        }
-    }
 
     function resetAll() {
         if(!confirm("編成と環境をすべてリセットしますか？")) return;
@@ -539,7 +320,9 @@
         candidates.sort((a, b) => b.score - a.score);
         
         candidates.forEach(item => {
-            const h = item.hero; const iconPath = `images/${h.id}.png`;
+            const h = item.hero; 
+            // ★変更：ディレクトリを images01/ に変更
+            const iconPath = `images01/${h.id}.png`;
             let badgeClass = "score-zero"; let scoreText = item.score > 0 ? `+${item.score.toFixed(1)}` : item.score.toFixed(1); 
             if (item.score > 0) badgeClass = "score-plus"; if (item.score < 0) badgeClass = "score-minus"; 
             let scoreHtml = `<span class="score-badge ${badgeClass}">${scoreText}</span>`;
@@ -551,8 +334,15 @@
     function selectHero(heroId) {
         if (currentModalSlotId.startsWith('enemy-')) { appState.enemies[currentModalSlotId] = heroId; } else { appState.allies[currentModalSlotId] = heroId; }
         const imgBox = document.getElementById(`img-${currentModalSlotId}`); const nameBox = document.getElementById(`name-${currentModalSlotId}`);
-        if (heroId) { const h = heroesDatabase.find(x => x.id === heroId); imgBox.innerHTML = `<img src="images/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; nameBox.innerText = h.name; } 
-        else { imgBox.innerHTML = currentModalSlotId.includes('tank') ? 'T' : currentModalSlotId.includes('dps') ? 'D' : 'S'; nameBox.innerText = "未選択"; }
+        if (heroId) { 
+            const h = heroesDatabase.find(x => x.id === heroId); 
+            // ★変更：ディレクトリを images01/ に変更
+            imgBox.innerHTML = `<img src="images01/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; 
+            nameBox.innerText = h.name; 
+        } else { 
+            imgBox.innerHTML = currentModalSlotId.includes('tank') ? 'T' : currentModalSlotId.includes('dps') ? 'D' : 'S'; 
+            nameBox.innerText = "未選択"; 
+        }
         closeModal(); updateSimulation();
     }
 

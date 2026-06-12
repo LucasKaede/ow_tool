@@ -284,7 +284,7 @@
         const getHealVal = (tags) => tags.includes('heal_high') ? 3 : (tags.includes('heal_med') ? 2 : (tags.includes('heal_low') ? 1 : 0));
 
         heroesDatabase.forEach(hero => {
-            // ▼ 味方視点：マップ環境評価（名指し ＞ ルール）
+            // ▼ 味方視点：マップ環境評価
             let mapScore = 0; let mapDesc = "";
             if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(allyMapRaw))) {
                 mapScore = 2.0; mapDesc = hero.mapRuleDesc;
@@ -311,7 +311,7 @@
                 appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${badMapDesc ? `: ${badMapDesc}` : ""} (-${badMapScore.toFixed(1)})</span>`); 
             }
             
-            // ▼ 味方視点：アンチ/シナジー/アンチシナジー評価
+            // ▼ 味方視点：アンチ/弱点評価
             activeEnemies.forEach(eId => { 
                 const e = heroesDatabase.find(h => h.id === eId); if (!e) return; 
                 let antiScore = 0; let weakScore = 0;
@@ -339,10 +339,10 @@
                 }
             });
 
+            // ▼ 味方視点：味方同士のシナジー／アンチシナジー（戦術不一致など）
             activeAllies.forEach(aId => { 
                 if(aId === hero.id) return; const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
                 
-                // シナジー
                 let synScore = 0; let descSyn = "";
                 if (hero.synergyTargets.includes(aId)) { synScore += 1.0; descSyn = hero.synergyDesc; }
                 else if (a.myTags.some(tag => hero.synergyTargets.includes(tag))) { synScore += 0.5; }
@@ -354,7 +354,6 @@
                     appState.allyResults[hero.id].details.push(`<span class="tag-synergy">【味方相性】with ${a.name}${descSyn ? `: ${descSyn}` : ""} (+${synScore.toFixed(1)})</span>`); 
                 } 
 
-                // ★ アンチシナジー（名指し ＞ タグ）
                 let badSynScore = 0; let descBadSyn = "";
                 if (hero.badSynergyTargets.includes(aId)) { badSynScore += 2.0; descBadSyn = hero.badSynergyDesc; }
                 else if (a.myTags.some(tag => hero.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
@@ -363,126 +362,82 @@
 
                 if (badSynScore > 0) {
                     appState.allyResults[hero.id].score -= badSynScore; 
-                    appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy">【味方相性悪】with ${a.name}${descBadSyn ? `: ${descBadSyn}` : ""} (-${badSynScore.toFixed(1)})</span>`); 
+                    appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy">【戦術の不一致】with ${a.name}${descBadSyn ? `: ${descBadSyn}` : "（テンポや距離が合わない）"} (-${badSynScore.toFixed(1)})</span>`); 
                 }
             });
 
-            // ★ 味方視点：サポートのヒール量不足チェック（一人目の選択が二人目の評価を変える）
+            // ★ 味方視点：サポートの「ヒール量」評価（大=3, 中=2, 小=1） -> 合計4未満はペナルティ
             if (hero.role === 'support') {
                 let myHeal = getHealVal(hero.myTags);
                 let otherSupId = activeAllies.find(id => id !== hero.id && heroesDatabase.find(h => h.id === id)?.role === 'support');
                 if (otherSupId && myHeal > 0) {
                     let otherSup = heroesDatabase.find(h => h.id === otherSupId);
                     let otherHeal = getHealVal(otherSup.myTags);
+                    let totalHeal = myHeal + otherHeal;
                     if (otherHeal > 0) {
-                        if (myHeal + otherHeal < 4) {
-                            appState.allyResults[hero.id].score -= 5.0; // 超重いペナルティ
-                            appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【致命的欠陥】ヒール量が絶望的 (-5.0)</span>`);
+                        if (totalHeal < 4) {
+                            appState.allyResults[hero.id].score -= 5.0; // 致命的欠陥として大幅減点
+                            appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【回復量不足】タンクが即死するペア（合計値: ${totalHeal} ＜ 4） (-5.0)</span>`);
                         } else {
-                            appState.allyResults[hero.id].score += 0.5; // 相方の大ヒールに助けられたボーナス
-                            appState.allyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方のヒール量でカバー可 (+0.5)</span>`);
+                            appState.allyResults[hero.id].score += 0.5; // バランスの良い構成へのボーナス
+                            appState.allyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方とのヒール量バランス◎（合計値: ${totalHeal}） (+0.5)</span>`);
                         }
                     }
                 }
             }
 
-            // ▼ 敵視点：マップ環境評価
+            // ▼ 敵視点（評価は味方側と同じロジックを反転して適用。※コード量節約のため同様の処理）
             let enemyMapScore = 0; let enemyMapDesc = "";
-            if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(enemyMapRaw))) {
-                enemyMapScore = 2.0; enemyMapDesc = hero.mapRuleDesc;
-            } else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) {
-                enemyMapScore = 1.5; enemyMapDesc = hero.mapRuleDesc;
-            } else if (enemySide !== "" && hero.mapRuleTargets.includes(enemySide)) {
-                enemyMapScore = 1.5; enemyMapDesc = hero.mapRuleDesc;
-            }
-            if (enemyMapScore > 0) {
-                appState.enemyResults[hero.id].score += enemyMapScore; 
-                appState.enemyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${enemyMapDesc ? `: ${enemyMapDesc}` : ""} (+${enemyMapScore.toFixed(1)})</span>`); 
-            }
+            if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(enemyMapRaw))) { enemyMapScore = 2.0; enemyMapDesc = hero.mapRuleDesc; } 
+            else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) { enemyMapScore = 1.5; enemyMapDesc = hero.mapRuleDesc; } 
+            else if (enemySide !== "" && hero.mapRuleTargets.includes(enemySide)) { enemyMapScore = 1.5; enemyMapDesc = hero.mapRuleDesc; }
+            if (enemyMapScore > 0) { appState.enemyResults[hero.id].score += enemyMapScore; appState.enemyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${enemyMapDesc ? `: ${enemyMapDesc}` : ""} (+${enemyMapScore.toFixed(1)})</span>`); }
 
             let enemyBadMapScore = 0; let enemyBadMapDesc = "";
-            if (currentMapBase !== "" && (hero.badMapRuleTargets.includes(currentMapBase) || hero.badMapRuleTargets.includes(enemyMapRaw))) {
-                enemyBadMapScore = 2.0; enemyBadMapDesc = hero.badMapRuleDesc;
-            } else if (currentRule !== "" && hero.badMapRuleTargets.includes(currentRule)) {
-                enemyBadMapScore = 1.5; enemyBadMapDesc = hero.badMapRuleDesc;
-            } else if (enemySide !== "" && hero.badMapRuleTargets.includes(enemySide)) {
-                enemyBadMapScore = 1.5; enemyBadMapDesc = hero.badMapRuleDesc;
-            }
-            if (enemyBadMapScore > 0) {
-                appState.enemyResults[hero.id].score -= enemyBadMapScore; 
-                appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${enemyBadMapDesc ? `: ${enemyBadMapDesc}` : ""} (-${enemyBadMapScore.toFixed(1)})</span>`); 
-            }
+            if (currentMapBase !== "" && (hero.badMapRuleTargets.includes(currentMapBase) || hero.badMapRuleTargets.includes(enemyMapRaw))) { enemyBadMapScore = 2.0; enemyBadMapDesc = hero.badMapRuleDesc; } 
+            else if (currentRule !== "" && hero.badMapRuleTargets.includes(currentRule)) { enemyBadMapScore = 1.5; enemyBadMapDesc = hero.badMapRuleDesc; } 
+            else if (enemySide !== "" && hero.badMapRuleTargets.includes(enemySide)) { enemyBadMapScore = 1.5; enemyBadMapDesc = hero.badMapRuleDesc; }
+            if (enemyBadMapScore > 0) { appState.enemyResults[hero.id].score -= enemyBadMapScore; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${enemyBadMapDesc ? `: ${enemyBadMapDesc}` : ""} (-${enemyBadMapScore.toFixed(1)})</span>`); }
             
-            // ▼ 敵視点：アンチ/シナジー/アンチシナジー評価
             activeAllies.forEach(aId => { 
                 const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
-                let antiScore = 0; let weakScore = 0;
-                let descAnti = ""; let descWeak = "";
+                let antiScore = 0; let weakScore = 0; let descAnti = ""; let descWeak = "";
+                if (hero.antiTargets.includes(aId)) { antiScore += 1.5; descAnti = hero.antiDesc; } else if (a.myTags.some(tag => hero.antiTargets.includes(tag))) { antiScore += 1.0; }
+                if (a.weakTargets.includes(hero.id)) { antiScore += 1.5; descAnti = descAnti || a.weakDesc; } else if (hero.myTags.some(tag => a.weakTargets.includes(tag))) { antiScore += 1.0; }
+                if (hero.weakTargets.includes(aId)) { weakScore += 1.5; descWeak = hero.weakDesc; } else if (a.myTags.some(tag => hero.weakTargets.includes(tag))) { weakScore += 1.0; }
+                if (a.antiTargets.includes(hero.id)) { weakScore += 1.5; descWeak = descWeak || a.antiDesc; } else if (hero.myTags.some(tag => a.antiTargets.includes(tag))) { weakScore += 1.0; }
 
-                if (hero.antiTargets.includes(aId)) { antiScore += 1.5; descAnti = hero.antiDesc; }
-                else if (a.myTags.some(tag => hero.antiTargets.includes(tag))) { antiScore += 1.0; }
-                
-                if (a.weakTargets.includes(hero.id)) { antiScore += 1.5; descAnti = descAnti || a.weakDesc; }
-                else if (hero.myTags.some(tag => a.weakTargets.includes(tag))) { antiScore += 1.0; }
-
-                if (hero.weakTargets.includes(aId)) { weakScore += 1.5; descWeak = hero.weakDesc; }
-                else if (a.myTags.some(tag => hero.weakTargets.includes(tag))) { weakScore += 1.0; }
-                
-                if (a.antiTargets.includes(hero.id)) { weakScore += 1.5; descWeak = descWeak || a.antiDesc; }
-                else if (hero.myTags.some(tag => a.antiTargets.includes(tag))) { weakScore += 1.0; }
-
-                if (antiScore > 0) {
-                    appState.enemyResults[hero.id].score += antiScore; 
-                    appState.enemyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${a.name}${descAnti ? `: ${descAnti}` : ""} (+${antiScore.toFixed(1)})</span>`); 
-                }
-                if (weakScore > 0) {
-                    appState.enemyResults[hero.id].score -= weakScore; 
-                    appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${a.name}${descWeak ? `: ${descWeak}` : ""} (-${weakScore.toFixed(1)})</span>`); 
-                }
+                if (antiScore > 0) { appState.enemyResults[hero.id].score += antiScore; appState.enemyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${a.name}${descAnti ? `: ${descAnti}` : ""} (+${antiScore.toFixed(1)})</span>`); }
+                if (weakScore > 0) { appState.enemyResults[hero.id].score -= weakScore; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${a.name}${descWeak ? `: ${descWeak}` : ""} (-${weakScore.toFixed(1)})</span>`); }
             });
 
             activeEnemies.forEach(eId => { 
                 if(eId === hero.id) return; const e = heroesDatabase.find(h => h.id === eId); if (!e) return; 
-                
-                // シナジー
                 let synScore = 0; let descSyn = "";
-                if (hero.synergyTargets.includes(eId)) { synScore += 1.0; descSyn = hero.synergyDesc; }
-                else if (e.myTags.some(tag => hero.synergyTargets.includes(tag))) { synScore += 0.5; }
-                if (e.synergyTargets.includes(hero.id)) { synScore += 1.0; descSyn = descSyn || e.synergyDesc; }
-                else if (hero.myTags.some(tag => e.synergyTargets.includes(tag))) { synScore += 0.5; }
+                if (hero.synergyTargets.includes(eId)) { synScore += 1.0; descSyn = hero.synergyDesc; } else if (e.myTags.some(tag => hero.synergyTargets.includes(tag))) { synScore += 0.5; }
+                if (e.synergyTargets.includes(hero.id)) { synScore += 1.0; descSyn = descSyn || e.synergyDesc; } else if (hero.myTags.some(tag => e.synergyTargets.includes(tag))) { synScore += 0.5; }
+                if (synScore > 0) { appState.enemyResults[hero.id].score += synScore; appState.enemyResults[hero.id].details.push(`<span class="tag-synergy">【敵同士相性】with ${e.name}${descSyn ? `: ${descSyn}` : ""} (+${synScore.toFixed(1)})</span>`); } 
 
-                if (synScore > 0) {
-                    appState.enemyResults[hero.id].score += synScore; 
-                    appState.enemyResults[hero.id].details.push(`<span class="tag-synergy">【敵同士相性】with ${e.name}${descSyn ? `: ${descSyn}` : ""} (+${synScore.toFixed(1)})</span>`); 
-                } 
-
-                // ★ アンチシナジー
                 let badSynScore = 0; let descBadSyn = "";
-                if (hero.badSynergyTargets.includes(eId)) { badSynScore += 2.0; descBadSyn = hero.badSynergyDesc; }
-                else if (e.myTags.some(tag => hero.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
-                if (e.badSynergyTargets.includes(hero.id)) { badSynScore += 2.0; descBadSyn = descBadSyn || e.badSynergyDesc; }
-                else if (hero.myTags.some(tag => e.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
-
-                if (badSynScore > 0) {
-                    appState.enemyResults[hero.id].score -= badSynScore; 
-                    appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy">【敵同士相性悪】with ${e.name}${descBadSyn ? `: ${descBadSyn}` : ""} (-${badSynScore.toFixed(1)})</span>`); 
-                }
+                if (hero.badSynergyTargets.includes(eId)) { badSynScore += 2.0; descBadSyn = hero.badSynergyDesc; } else if (e.myTags.some(tag => hero.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
+                if (e.badSynergyTargets.includes(hero.id)) { badSynScore += 2.0; descBadSyn = descBadSyn || e.badSynergyDesc; } else if (hero.myTags.some(tag => e.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
+                if (badSynScore > 0) { appState.enemyResults[hero.id].score -= badSynScore; appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy">【戦術の不一致】with ${e.name}${descBadSyn ? `: ${descBadSyn}` : ""} (-${badSynScore.toFixed(1)})</span>`); }
             });
 
-            // ★ 敵視点：サポートのヒール量不足チェック
             if (hero.role === 'support') {
                 let myHeal = getHealVal(hero.myTags);
                 let otherSupId = activeEnemies.find(id => id !== hero.id && heroesDatabase.find(h => h.id === id)?.role === 'support');
                 if (otherSupId && myHeal > 0) {
                     let otherSup = heroesDatabase.find(h => h.id === otherSupId);
                     let otherHeal = getHealVal(otherSup.myTags);
+                    let totalHeal = myHeal + otherHeal;
                     if (otherHeal > 0) {
-                        if (myHeal + otherHeal < 4) {
+                        if (totalHeal < 4) {
                             appState.enemyResults[hero.id].score -= 5.0;
-                            appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【致命的欠陥】ヒール量が絶望的 (-5.0)</span>`);
+                            appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【回復量不足】タンクが即死するペア（合計値: ${totalHeal} ＜ 4） (-5.0)</span>`);
                         } else {
                             appState.enemyResults[hero.id].score += 0.5;
-                            appState.enemyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方のヒール量でカバー可 (+0.5)</span>`);
+                            appState.enemyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方とのヒール量バランス◎（合計値: ${totalHeal}） (+0.5)</span>`);
                         }
                     }
                 }
@@ -507,26 +462,14 @@
 
             let scoredHeroes = heroesDatabase.map(hero => {
                 let score = 0;
-                
-                // 名指し(1.5)優先、なければタグ(1.0)
-                if (hero.antiTargets.includes(eId)) score += 1.5;
-                else if (eHero.myTags.some(tag => hero.antiTargets.includes(tag))) score += 1.0;
-                
-                if (eHero.weakTargets.includes(hero.id)) score += 1.5;
-                else if (hero.myTags.some(tag => eHero.weakTargets.includes(tag))) score += 1.0;
-                
-                // 弱点減点
-                if (hero.weakTargets.includes(eId)) score -= 1.5;
-                else if (eHero.myTags.some(tag => hero.weakTargets.includes(tag))) score -= 1.0;
-                
-                if (eHero.antiTargets.includes(hero.id)) score -= 1.5;
-                else if (hero.myTags.some(tag => eHero.antiTargets.includes(tag))) score -= 1.0;
-                
+                if (hero.antiTargets.includes(eId)) score += 1.5; else if (eHero.myTags.some(tag => hero.antiTargets.includes(tag))) score += 1.0;
+                if (eHero.weakTargets.includes(hero.id)) score += 1.5; else if (hero.myTags.some(tag => eHero.weakTargets.includes(tag))) score += 1.0;
+                if (hero.weakTargets.includes(eId)) score -= 1.5; else if (eHero.myTags.some(tag => hero.weakTargets.includes(tag))) score -= 1.0;
+                if (eHero.antiTargets.includes(hero.id)) score -= 1.5; else if (hero.myTags.some(tag => eHero.antiTargets.includes(tag))) score -= 1.0;
                 return { hero, score };
             });
 
             let validCounters = scoredHeroes.filter(item => item.score > 0);
-            
             let tanks = validCounters.filter(item => item.hero.role === 'tank').sort((a, b) => b.score - a.score);
             let dps = validCounters.filter(item => item.hero.role === 'dps').sort((a, b) => b.score - a.score);
 
@@ -563,38 +506,20 @@
 
         heroesDatabase.forEach(hero => {
             let score = 0;
+            if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(currentMapRaw))) { score += 2.0; } 
+            else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) { score += 1.5; } 
+            else if (allySide !== "" && hero.mapRuleTargets.includes(allySide)) { score += 1.5; }
 
-            if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(currentMapRaw))) {
-                score += 2.0;
-            } else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) {
-                score += 1.5;
-            } else if (allySide !== "" && hero.mapRuleTargets.includes(allySide)) {
-                score += 1.5;
-            }
-
-            if (currentMapBase !== "" && (hero.badMapRuleTargets.includes(currentMapBase) || hero.badMapRuleTargets.includes(currentMapRaw))) {
-                score -= 2.0;
-            } else if (currentRule !== "" && hero.badMapRuleTargets.includes(currentRule)) {
-                score -= 1.5;
-            } else if (allySide !== "" && hero.badMapRuleTargets.includes(allySide)) {
-                score -= 1.5;
-            }
+            if (currentMapBase !== "" && (hero.badMapRuleTargets.includes(currentMapBase) || hero.badMapRuleTargets.includes(currentMapRaw))) { score -= 2.0; } 
+            else if (currentRule !== "" && hero.badMapRuleTargets.includes(currentRule)) { score -= 1.5; } 
+            else if (allySide !== "" && hero.badMapRuleTargets.includes(allySide)) { score -= 1.5; }
 
             activeEnemies.forEach(eId => {
-                const e = heroesDatabase.find(h => h.id === eId);
-                if (!e) return;
-                
-                if (hero.antiTargets.includes(eId)) score += 1.5;
-                else if (e.myTags.some(tag => hero.antiTargets.includes(tag))) score += 1.0;
-
-                if (e.weakTargets.includes(hero.id)) score += 1.5;
-                else if (hero.myTags.some(tag => e.weakTargets.includes(tag))) score += 1.0;
-
-                if (hero.weakTargets.includes(eId)) score -= 1.5;
-                else if (e.myTags.some(tag => hero.weakTargets.includes(tag))) score -= 1.0;
-
-                if (e.antiTargets.includes(hero.id)) score -= 1.5;
-                else if (hero.myTags.some(tag => e.antiTargets.includes(tag))) score -= 1.0;
+                const e = heroesDatabase.find(h => h.id === eId); if (!e) return;
+                if (hero.antiTargets.includes(eId)) score += 1.5; else if (e.myTags.some(tag => hero.antiTargets.includes(tag))) score += 1.0;
+                if (e.weakTargets.includes(hero.id)) score += 1.5; else if (hero.myTags.some(tag => e.weakTargets.includes(tag))) score += 1.0;
+                if (hero.weakTargets.includes(eId)) score -= 1.5; else if (e.myTags.some(tag => hero.weakTargets.includes(tag))) score -= 1.0;
+                if (e.antiTargets.includes(hero.id)) score -= 1.5; else if (hero.myTags.some(tag => e.antiTargets.includes(tag))) score -= 1.0;
             });
             baseScores[hero.id] = score;
         });
@@ -623,30 +548,22 @@
                                 for (let b of comp) {
                                     if (a.id === b.id) continue;
                                     
-                                    // シナジー
-                                    if (a.synergyTargets.includes(b.id)) {
-                                        score += 1.0;
-                                    } else if (b.myTags.some(tag => a.synergyTargets.includes(tag))) {
-                                        score += 0.5;
-                                    }
+                                    if (a.synergyTargets.includes(b.id)) score += 1.0;
+                                    else if (b.myTags.some(tag => a.synergyTargets.includes(tag))) score += 0.5;
                                     
-                                    // ★ アンチシナジー
-                                    if (a.badSynergyTargets.includes(b.id)) {
-                                        score -= 2.0;
-                                    } else if (b.myTags.some(tag => a.badSynergyTargets.includes(tag))) {
-                                        score -= 1.5;
-                                    }
+                                    if (a.badSynergyTargets.includes(b.id)) score -= 2.0;
+                                    else if (b.myTags.some(tag => a.badSynergyTargets.includes(tag))) score -= 1.5;
                                 }
                             }
                             
-                            // ★ AI推奨チームのヒール量ペナルティ計算
+                            // ★ AIチーム構築でのヒール量チェック（大+小、中+中 の条件を満たさない場合は除外レベルの減点）
                             let h1 = getHealVal(sups[x].myTags);
                             let h2 = getHealVal(sups[y].myTags);
                             if (h1 > 0 && h2 > 0) {
                                 if (h1 + h2 < 4) {
-                                    score -= 10.0; // AIが絶対に選ばないレベルの超特大ペナルティ
+                                    score -= 10.0; // AIが間違っても選ばないように特大ペナルティ
                                 } else {
-                                    score += 1.0;  // ヒール要件を満たした美しい構成へのボーナス
+                                    score += 1.0;  // 構成美ボーナス
                                 }
                             }
 

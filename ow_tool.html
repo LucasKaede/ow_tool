@@ -75,7 +75,7 @@
         .details-hero-name { font-size: 1.2rem; font-weight: bold; }
         .details-total-score { font-size: 1rem; font-weight: bold; padding: 2px 8px; border-radius: 4px; border: none; box-shadow: none; }
         .details-content { display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; line-height: 1.4; color: var(--text-sub); }
-        .tag-env { color: #c084fc; } .tag-env-bad { color: #f43f5e; } .tag-anti { color: #34d399; } .tag-synergy { color: #60a5fa; }
+        .tag-env { color: #c084fc; } .tag-env-bad { color: #f43f5e; } .tag-anti { color: #34d399; } .tag-synergy { color: #60a5fa; } .tag-anti-synergy { color: #f97316; }
 
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; display: none; flex-direction: column; justify-content: flex-end; opacity: 0; transition: opacity 0.3s; }
         .modal-overlay.is-active { display: flex; opacity: 1; }
@@ -123,7 +123,6 @@
         </div>
     </div>
 
-    <!-- 味方チーム -->
     <div>
         <div class="team-title-row">
             <div class="section-title title-ally">味方チーム (Ally)</div>
@@ -138,7 +137,6 @@
         </div>
     </div>
 
-    <!-- 敵チーム -->
     <div>
         <div class="team-title-row">
             <div class="section-title title-enemy">敵チーム (Enemy)</div>
@@ -154,7 +152,6 @@
         <div style="font-size:0.65rem; color:var(--text-sub); text-align:right; margin-top:5px;">※アイコン下：狩れるアンチピック（Tank1, DPS2）</div>
     </div>
 
-    <!-- 5人合算の最適チーム構成枠 -->
     <div>
         <div class="section-title standalone-title title-ally">💡 最適チーム構成 (AI推奨)</div>
         <div id="optimal-team-box" style="display: flex; flex-direction: column; gap: 10px;">
@@ -253,7 +250,9 @@
                         myTags: parseTargets(columns[7]),
                         mapRuleTargets: parseTargets(columns[8]), mapRuleDesc: columns[9] || "",
                         badMapRuleTargets: parseTargets(columns[10]), badMapRuleDesc: columns[11] || "",
-                        weakTargets: parseTargets(columns[12]), weakDesc: columns[13] || ""
+                        weakTargets: parseTargets(columns[12]), weakDesc: columns[13] || "",
+                        // ★ アンチシナジー用の列（インデックス14と15）を追加
+                        badSynergyTargets: parseTargets(columns[14]), badSynergyDesc: columns[15] || ""
                     });
                 }
             }
@@ -283,6 +282,9 @@
         appState.allyResults = {}; appState.enemyResults = {};
         heroesDatabase.forEach(h => { appState.allyResults[h.id] = { hero: h, score: 0, details: [] }; appState.enemyResults[h.id] = { hero: h, score: 0, details: [] }; });
 
+        // ヒール量判定用ヘルパー関数
+        const getHealVal = (tags) => tags.includes('heal_high') ? 3 : (tags.includes('heal_med') ? 2 : (tags.includes('heal_low') ? 1 : 0));
+
         heroesDatabase.forEach(hero => {
             // ▼ 味方視点：マップ環境評価（名指し ＞ ルール）
             let mapScore = 0; let mapDesc = "";
@@ -311,7 +313,7 @@
                 appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${badMapDesc ? `: ${badMapDesc}` : ""} (-${badMapScore.toFixed(1)})</span>`); 
             }
             
-            // ▼ 味方視点：アンチ/シナジー評価（名指し ＞ タグ）
+            // ▼ 味方視点：アンチ/シナジー/アンチシナジー評価
             activeEnemies.forEach(eId => { 
                 const e = heroesDatabase.find(h => h.id === eId); if (!e) return; 
                 let antiScore = 0; let weakScore = 0;
@@ -341,11 +343,11 @@
 
             activeAllies.forEach(aId => { 
                 if(aId === hero.id) return; const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
-                let synScore = 0; let descSyn = "";
                 
+                // シナジー
+                let synScore = 0; let descSyn = "";
                 if (hero.synergyTargets.includes(aId)) { synScore += 1.0; descSyn = hero.synergyDesc; }
                 else if (a.myTags.some(tag => hero.synergyTargets.includes(tag))) { synScore += 0.5; }
-                
                 if (a.synergyTargets.includes(hero.id)) { synScore += 1.0; descSyn = descSyn || a.synergyDesc; }
                 else if (hero.myTags.some(tag => a.synergyTargets.includes(tag))) { synScore += 0.5; }
 
@@ -353,9 +355,35 @@
                     appState.allyResults[hero.id].score += synScore; 
                     appState.allyResults[hero.id].details.push(`<span class="tag-synergy">【味方相性】with ${a.name}${descSyn ? `: ${descSyn}` : ""} (+${synScore.toFixed(1)})</span>`); 
                 } 
+
+                // ★ アンチシナジー
+                let badSynScore = 0; let descBadSyn = "";
+                if (hero.badSynergyTargets.includes(aId)) { badSynScore += 2.0; descBadSyn = hero.badSynergyDesc; }
+                else if (a.myTags.some(tag => hero.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
+                if (a.badSynergyTargets.includes(hero.id)) { badSynScore += 2.0; descBadSyn = descBadSyn || a.badSynergyDesc; }
+                else if (hero.myTags.some(tag => a.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
+
+                if (badSynScore > 0) {
+                    appState.allyResults[hero.id].score -= badSynScore; 
+                    appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy">【味方相性悪】with ${a.name}${descBadSyn ? `: ${descBadSyn}` : ""} (-${badSynScore.toFixed(1)})</span>`); 
+                }
             });
 
-            // ▼ 敵視点：マップ環境評価（名指し ＞ ルール）
+            // ★ 味方視点：サポートのヒール量不足チェック（大+小、中+中未満ならペナルティ）
+            if (hero.role === 'support') {
+                let myHeal = getHealVal(hero.myTags);
+                let otherSupId = activeAllies.find(id => id !== hero.id && heroesDatabase.find(h => h.id === id)?.role === 'support');
+                if (otherSupId && myHeal > 0) {
+                    let otherSup = heroesDatabase.find(h => h.id === otherSupId);
+                    let otherHeal = getHealVal(otherSup.myTags);
+                    if (otherHeal > 0 && (myHeal + otherHeal < 4)) {
+                        appState.allyResults[hero.id].score -= 1.5;
+                        appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy">【回復量不足】タンクを支えきれない構成 (-1.5)</span>`);
+                    }
+                }
+            }
+
+            // ▼ 敵視点：マップ環境評価
             let enemyMapScore = 0; let enemyMapDesc = "";
             if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(enemyMapRaw))) {
                 enemyMapScore = 2.0; enemyMapDesc = hero.mapRuleDesc;
@@ -382,7 +410,7 @@
                 appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${enemyBadMapDesc ? `: ${enemyBadMapDesc}` : ""} (-${enemyBadMapScore.toFixed(1)})</span>`); 
             }
             
-            // ▼ 敵視点：アンチ/シナジー評価
+            // ▼ 敵視点：アンチ/シナジー/アンチシナジー評価
             activeAllies.forEach(aId => { 
                 const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
                 let antiScore = 0; let weakScore = 0;
@@ -412,11 +440,11 @@
 
             activeEnemies.forEach(eId => { 
                 if(eId === hero.id) return; const e = heroesDatabase.find(h => h.id === eId); if (!e) return; 
-                let synScore = 0; let descSyn = "";
                 
+                // シナジー
+                let synScore = 0; let descSyn = "";
                 if (hero.synergyTargets.includes(eId)) { synScore += 1.0; descSyn = hero.synergyDesc; }
                 else if (e.myTags.some(tag => hero.synergyTargets.includes(tag))) { synScore += 0.5; }
-                
                 if (e.synergyTargets.includes(hero.id)) { synScore += 1.0; descSyn = descSyn || e.synergyDesc; }
                 else if (hero.myTags.some(tag => e.synergyTargets.includes(tag))) { synScore += 0.5; }
 
@@ -424,7 +452,33 @@
                     appState.enemyResults[hero.id].score += synScore; 
                     appState.enemyResults[hero.id].details.push(`<span class="tag-synergy">【敵同士相性】with ${e.name}${descSyn ? `: ${descSyn}` : ""} (+${synScore.toFixed(1)})</span>`); 
                 } 
+
+                // ★ アンチシナジー
+                let badSynScore = 0; let descBadSyn = "";
+                if (hero.badSynergyTargets.includes(eId)) { badSynScore += 2.0; descBadSyn = hero.badSynergyDesc; }
+                else if (e.myTags.some(tag => hero.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
+                if (e.badSynergyTargets.includes(hero.id)) { badSynScore += 2.0; descBadSyn = descBadSyn || e.badSynergyDesc; }
+                else if (hero.myTags.some(tag => e.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
+
+                if (badSynScore > 0) {
+                    appState.enemyResults[hero.id].score -= badSynScore; 
+                    appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy">【敵同士相性悪】with ${e.name}${descBadSyn ? `: ${descBadSyn}` : ""} (-${badSynScore.toFixed(1)})</span>`); 
+                }
             });
+
+            // ★ 敵視点：サポートのヒール量不足チェック
+            if (hero.role === 'support') {
+                let myHeal = getHealVal(hero.myTags);
+                let otherSupId = activeEnemies.find(id => id !== hero.id && heroesDatabase.find(h => h.id === id)?.role === 'support');
+                if (otherSupId && myHeal > 0) {
+                    let otherSup = heroesDatabase.find(h => h.id === otherSupId);
+                    let otherHeal = getHealVal(otherSup.myTags);
+                    if (otherHeal > 0 && (myHeal + otherHeal < 4)) {
+                        appState.enemyResults[hero.id].score -= 1.5;
+                        appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy">【回復量不足】タンクを支えきれない構成 (-1.5)</span>`);
+                    }
+                }
+            }
         });
 
         updateScoresUI(); 
@@ -504,7 +558,6 @@
         heroesDatabase.forEach(hero => {
             let score = 0;
 
-            // ★ 最適化AIの環境スコア計算も「名指し＞ルール」優先を徹底（合算なし）
             if (currentMapBase !== "" && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(currentMapRaw))) {
                 score += 2.0;
             } else if (currentRule !== "" && hero.mapRuleTargets.includes(currentRule)) {
@@ -548,6 +601,8 @@
 
         let bestComp = null;
         let maxScore = -9999;
+        
+        const getHealVal = (tags) => tags.includes('heal_high') ? 3 : (tags.includes('heal_med') ? 2 : (tags.includes('heal_low') ? 1 : 0));
 
         for (let t of tanks) {
             for (let i = 0; i < dps.length; i++) {
@@ -561,12 +616,28 @@
                             for (let a of comp) {
                                 for (let b of comp) {
                                     if (a.id === b.id) continue;
+                                    
+                                    // シナジー
                                     if (a.synergyTargets.includes(b.id)) {
                                         score += 1.0;
                                     } else if (b.myTags.some(tag => a.synergyTargets.includes(tag))) {
                                         score += 0.5;
                                     }
+                                    
+                                    // ★ アンチシナジー
+                                    if (a.badSynergyTargets.includes(b.id)) {
+                                        score -= 2.0;
+                                    } else if (b.myTags.some(tag => a.badSynergyTargets.includes(tag))) {
+                                        score -= 1.5;
+                                    }
                                 }
+                            }
+                            
+                            // ★ AI推奨チームのヒール量ペナルティ計算
+                            let h1 = getHealVal(sups[x].myTags);
+                            let h2 = getHealVal(sups[y].myTags);
+                            if (h1 > 0 && h2 > 0 && (h1 + h2 < 4)) {
+                                score -= 3.0; // ヒール不足はチーム全体の致命的欠陥として大幅減点
                             }
 
                             if (score > maxScore) {

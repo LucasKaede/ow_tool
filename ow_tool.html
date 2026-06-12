@@ -55,10 +55,6 @@
         .slot-support .slot-image-box { border-bottom: 3px solid var(--accent-support); }
         .slot-name { font-size: 0.65rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; color: var(--text-sub); }
 
-        .suggest-box { display: flex; gap: 3px; margin-top: 5px; height: 20px; min-height: 20px; justify-content: center; width: 100%; }
-        .suggest-icon { width: 20px; height: 20px; border-radius: 4px; background-color: var(--bg-color); overflow: hidden; border: 1px solid var(--panel-sub); }
-        .suggest-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
         .optimal-team-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 12px; border: 1px dashed var(--accent-ally); display: flex; align-items: center; justify-content: center; min-height: 70px; }
 
         .score-badge { padding: 2px 6px; border-radius: 8px; font-weight: bold; border: 2px solid var(--bg-color); box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
@@ -105,47 +101,74 @@
 </header>
 
 <div class="container">
+    
+    <!-- 📷 カメラスキャン機能（コメントアウト封印中） -->
+    <!--
+    <div>
+        <div class="section-title standalone-title title-scan">📷 画像から自動編成 (Beta)</div>
+        <div class="scan-panel">
+            <input type="file" id="image-upload" accept="image/*" style="display: none;" onchange="processFileImage(event)">
+            <button id="scan-live-btn" class="scan-btn" disabled onclick="startLiveCamera()">📷 リアルタイム スキャン</button>
+            <button id="scan-file-btn" class="scan-btn-sub" disabled onclick="document.getElementById('image-upload').click()">📁 保存した写真から読み込む</button>
+            <div class="scan-note">スマホを【横向き】にしてスコアボードを写してください。</div>
+            <canvas id="hidden-canvas" style="display:none;"></canvas>
+            <canvas id="template-canvas" style="display:none;"></canvas>
+        </div>
+    </div>
+    -->
+
     <div>
         <div class="section-title standalone-title title-env">マップ ＆ ルール</div>
         <div class="env-row">
-            <div class="env-select-wrap"><select id="match-rule" onchange="updateMapOptions(); updateSimulation();"><option value="">ルール選択...</option><option value="コントロール">コントロール</option><option value="エスコート">エスコート</option><option value="ハイブリッド">ハイブリッド</option><option value="プッシュ">プッシュ</option><option value="フラッシュポイント">フラッシュポイント</option><option value="クラッシュ">クラッシュ</option></select></div>
+            <div class="env-select-wrap">
+                <select id="match-rule" onchange="updateMapOptions(); updateSimulation();">
+                    <option value="">ルール選択...</option>
+                    <option value="コントロール">コントロール 🚩</option>
+                    <option value="エスコート">エスコート 🚚</option>
+                    <option value="ハイブリッド">ハイブリッド 🚩/🚚</option>
+                    <option value="プッシュ">プッシュ 🤖</option>
+                    <option value="フラッシュポイント">フラッシュポイント ⚡</option>
+                    <option value="クラッシュ">クラッシュ 💥</option>
+                </select>
+            </div>
             <div class="env-select-wrap"><select id="match-map" onchange="updateSimulation()"><option value="">マップ選択...</option></select></div>
         </div>
     </div>
 
-    <div>
-        <div class="team-title-row">
-            <div class="section-title title-enemy">敵チーム (Enemy)</div>
-            <div id="enemy-team-score" class="score-badge team-score-badge">0.0</div>
-        </div>
-        <div class="team-row">
-            <div class="slot-wrapper slot-tank" id="wrap-enemy-tank" onclick="selectFrame('enemy-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-tank', 'tank')"><div class="slot-empty-icon" id="img-enemy-tank">T</div></div><div class="slot-name" id="name-enemy-tank">未選択</div><div class="suggest-box" id="suggest-enemy-tank"></div><div id="score-enemy-tank" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps1" onclick="selectFrame('enemy-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps1', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps1">D</div></div><div class="slot-name" id="name-enemy-dps1">未選択</div><div class="suggest-box" id="suggest-enemy-dps1"></div><div id="score-enemy-dps1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps2" onclick="selectFrame('enemy-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps2', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps2">D</div></div><div class="slot-name" id="name-enemy-dps2">未選択</div><div class="suggest-box" id="suggest-enemy-dps2"></div><div id="score-enemy-dps2" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-enemy-sup1" onclick="selectFrame('enemy-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup1', 'support')"><div class="slot-empty-icon" id="img-enemy-sup1">S</div></div><div class="slot-name" id="name-enemy-sup1">未選択</div><div class="suggest-box" id="suggest-enemy-sup1"></div><div id="score-enemy-sup1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-enemy-sup2" onclick="selectFrame('enemy-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup2', 'support')"><div class="slot-empty-icon" id="img-enemy-sup2">S</div></div><div class="slot-name" id="name-enemy-sup2">未選択</div><div class="suggest-box" id="suggest-enemy-sup2"></div><div id="score-enemy-sup2" class="score-badge slot-score"></div></div>
-        </div>
-        <div style="font-size:0.65rem; color:var(--text-sub); text-align:right; margin-top:5px;">※アイコン下：個別の対策キャラ</div>
-    </div>
-
+    <!-- 味方チームを上に配置 -->
     <div>
         <div class="team-title-row">
             <div class="section-title title-ally">味方チーム (Ally)</div>
             <div id="ally-team-score" class="score-badge team-score-badge">0.0</div>
         </div>
         <div class="team-row">
-            <div class="slot-wrapper slot-tank" id="wrap-ally-tank" onclick="selectFrame('ally-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-tank', 'tank')"><div class="slot-empty-icon" id="img-ally-tank">T</div></div><div class="slot-name" id="name-ally-tank">未選択</div><div class="suggest-box" id="suggest-ally-tank"></div><div id="score-ally-tank" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-ally-dps1" onclick="selectFrame('ally-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-dps1', 'dps')"><div class="slot-empty-icon" id="img-ally-dps1">D</div></div><div class="slot-name" id="name-ally-dps1">未選択</div><div class="suggest-box" id="suggest-ally-dps1"></div><div id="score-ally-dps1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-ally-dps2" onclick="selectFrame('ally-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-dps2', 'dps')"><div class="slot-empty-icon" id="img-ally-dps2">D</div></div><div class="slot-name" id="name-ally-dps2">未選択</div><div class="suggest-box" id="suggest-ally-dps2"></div><div id="score-ally-dps2" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-ally-sup1" onclick="selectFrame('ally-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-sup1', 'support')"><div class="slot-empty-icon" id="img-ally-sup1">S</div></div><div class="slot-name" id="name-ally-sup1">未選択</div><div class="suggest-box" id="suggest-ally-sup1"></div><div id="score-ally-sup1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-ally-sup2" onclick="selectFrame('ally-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-sup2', 'support')"><div class="slot-empty-icon" id="img-ally-sup2">S</div></div><div class="slot-name" id="name-ally-sup2">未選択</div><div class="suggest-box" id="suggest-ally-sup2"></div><div id="score-ally-sup2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-tank" id="wrap-ally-tank" onclick="selectFrame('ally-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-tank', 'tank')"><div class="slot-empty-icon" id="img-ally-tank">T</div></div><div class="slot-name" id="name-ally-tank">未選択</div><div id="score-ally-tank" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-ally-dps1" onclick="selectFrame('ally-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-dps1', 'dps')"><div class="slot-empty-icon" id="img-ally-dps1">D</div></div><div class="slot-name" id="name-ally-dps1">未選択</div><div id="score-ally-dps1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-ally-dps2" onclick="selectFrame('ally-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-dps2', 'dps')"><div class="slot-empty-icon" id="img-ally-dps2">D</div></div><div class="slot-name" id="name-ally-dps2">未選択</div><div id="score-ally-dps2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-ally-sup1" onclick="selectFrame('ally-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-sup1', 'support')"><div class="slot-empty-icon" id="img-ally-sup1">S</div></div><div class="slot-name" id="name-ally-sup1">未選択</div><div id="score-ally-sup1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-ally-sup2" onclick="selectFrame('ally-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'ally-sup2', 'support')"><div class="slot-empty-icon" id="img-ally-sup2">S</div></div><div class="slot-name" id="name-ally-sup2">未選択</div><div id="score-ally-sup2" class="score-badge slot-score"></div></div>
         </div>
-        <div style="font-size:0.65rem; color:var(--text-sub); text-align:right; margin-top:5px;">※アイコン下：相性の良いキャラ</div>
     </div>
 
+    <!-- 敵チームを下に配置 -->
+    <div>
+        <div class="team-title-row">
+            <div class="section-title title-enemy">敵チーム (Enemy)</div>
+            <div id="enemy-team-score" class="score-badge team-score-badge">0.0</div>
+        </div>
+        <div class="team-row">
+            <div class="slot-wrapper slot-tank" id="wrap-enemy-tank" onclick="selectFrame('enemy-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-tank', 'tank')"><div class="slot-empty-icon" id="img-enemy-tank">T</div></div><div class="slot-name" id="name-enemy-tank">未選択</div><div id="score-enemy-tank" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps1" onclick="selectFrame('enemy-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps1', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps1">D</div></div><div class="slot-name" id="name-enemy-dps1">未選択</div><div id="score-enemy-dps1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps2" onclick="selectFrame('enemy-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps2', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps2">D</div></div><div class="slot-name" id="name-enemy-dps2">未選択</div><div id="score-enemy-dps2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-enemy-sup1" onclick="selectFrame('enemy-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup1', 'support')"><div class="slot-empty-icon" id="img-enemy-sup1">S</div></div><div class="slot-name" id="name-enemy-sup1">未選択</div><div id="score-enemy-sup1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-enemy-sup2" onclick="selectFrame('enemy-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup2', 'support')"><div class="slot-empty-icon" id="img-enemy-sup2">S</div></div><div class="slot-name" id="name-enemy-sup2">未選択</div><div id="score-enemy-sup2" class="score-badge slot-score"></div></div>
+        </div>
+    </div>
+
+    <!-- 5人合算の最適チーム構成枠 -->
     <div>
         <div class="section-title standalone-title title-ally">💡 最適チーム構成 (AI推奨)</div>
-        <div id="optimal-team-box">
+        <div id="optimal-team-box" style="display: flex; flex-direction: column; gap: 10px;">
             <div class="optimal-team-panel">
                 <div style="text-align:center; color:#64748b; font-size: 0.8rem; width:100%;">データを読み込み中...</div>
             </div>
@@ -191,7 +214,6 @@
             document.getElementById(`name-${slotId}`).innerText = "未選択";
             document.getElementById(`score-${slotId}`).classList.remove('is-visible');
             document.getElementById(`wrap-${slotId}`).classList.remove('is-selected');
-            document.getElementById(`suggest-${slotId}`).innerHTML = "";
         });
         document.getElementById("optimal-team-box").innerHTML = `
             <div class="optimal-team-panel">
@@ -252,9 +274,29 @@
         if(heroesDatabase.length === 0) return;
         const currentRule = document.getElementById("match-rule").value.toLowerCase();
         const currentMapRaw = document.getElementById("match-map").value.toLowerCase();
-        let currentMapBase = currentMapRaw; let currentSide = "";
-        if (currentMapRaw.endsWith("_atk")) { currentMapBase = currentMapRaw.replace("_atk", ""); currentSide = "atk"; } else if (currentMapRaw.endsWith("_def")) { currentMapBase = currentMapRaw.replace("_def", ""); currentSide = "def"; }
-        const activeEnvTags = [currentRule, currentMapBase, currentSide, currentMapRaw].filter(t => t !== "");
+        
+        // ★攻守の非対称性を考慮したマップタグの生成
+        let currentMapBase = currentMapRaw;
+        let allySide = "";
+        let enemySide = "";
+        let allyMapRaw = currentMapRaw;
+        let enemyMapRaw = currentMapRaw;
+
+        if (currentMapRaw.endsWith("_atk")) { 
+            currentMapBase = currentMapRaw.replace("_atk", ""); 
+            allySide = "atk"; 
+            enemySide = "def"; // 自分が攻めなら、敵は守りの環境で評価する
+            enemyMapRaw = currentMapBase + "_def";
+        } else if (currentMapRaw.endsWith("_def")) { 
+            currentMapBase = currentMapRaw.replace("_def", ""); 
+            allySide = "def"; 
+            enemySide = "atk"; // 自分が守りなら、敵は攻めの環境で評価する
+            enemyMapRaw = currentMapBase + "_atk";
+        }
+
+        const allyEnvTags = [currentRule, currentMapBase, allySide, allyMapRaw].filter(t => t !== "");
+        const enemyEnvTags = [currentRule, currentMapBase, enemySide, enemyMapRaw].filter(t => t !== "");
+
         const activeAllies = Object.values(appState.allies).filter(v => v !== "");
         const activeEnemies = Object.values(appState.enemies).filter(v => v !== "");
 
@@ -262,87 +304,58 @@
         heroesDatabase.forEach(h => { appState.allyResults[h.id] = { hero: h, score: 0, details: [] }; appState.enemyResults[h.id] = { hero: h, score: 0, details: [] }; });
 
         heroesDatabase.forEach(hero => {
-            if (activeEnvTags.length > 0 && hero.mapRuleTargets.some(tag => activeEnvTags.includes(tag))) { appState.allyResults[hero.id].score += 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc ? `: ${hero.mapRuleDesc}` : ""} (+1.0)</span>`); }
-            if (activeEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => activeEnvTags.includes(tag))) { appState.allyResults[hero.id].score -= 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc ? `: ${hero.badMapRuleDesc}` : ""} (-1.0)</span>`); }
-            activeEnemies.forEach(eId => { const e = heroesDatabase.find(h => h.id === eId); if (!e) return; if (hero.antiTargets.includes(eId) || e.myTags.some(tag => hero.antiTargets.includes(tag))) { appState.allyResults[hero.id].score += 1.5; appState.allyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${e.name}${hero.antiDesc ? `: ${hero.antiDesc}` : ""} (+1.5)</span>`); } if (hero.weakTargets.includes(eId) || e.myTags.some(tag => hero.weakTargets.includes(tag))) { appState.allyResults[hero.id].score -= 1.5; appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${e.name}${hero.weakDesc ? `: ${hero.weakDesc}` : ""} (-1.5)</span>`); }});
-            activeAllies.forEach(aId => { if(aId === hero.id) return; const a = heroesDatabase.find(h => h.id === aId); if (!a) return; if (hero.synergyTargets.includes(aId) || a.myTags.some(tag => hero.synergyTargets.includes(tag))) { appState.allyResults[hero.id].score += 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-synergy">【味方相性】with ${a.name}${hero.synergyDesc ? `: ${hero.synergyDesc}` : ""} (+1.0)</span>`); } });
+            // ▼味方視点の評価 (allyEnvTagsを使用)
+            if (allyEnvTags.length > 0 && hero.mapRuleTargets.some(tag => allyEnvTags.includes(tag))) { appState.allyResults[hero.id].score += 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc ? `: ${hero.mapRuleDesc}` : ""} (+1.0)</span>`); }
+            if (allyEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => allyEnvTags.includes(tag))) { appState.allyResults[hero.id].score -= 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc ? `: ${hero.badMapRuleDesc}` : ""} (-1.0)</span>`); }
+            
+            activeEnemies.forEach(eId => { 
+                const e = heroesDatabase.find(h => h.id === eId); if (!e) return; 
+                if (hero.antiTargets.includes(eId) || e.myTags.some(tag => hero.antiTargets.includes(tag))) { appState.allyResults[hero.id].score += 1.5; appState.allyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${e.name}${hero.antiDesc ? `: ${hero.antiDesc}` : ""} (+1.5)</span>`); } 
+                if (hero.weakTargets.includes(eId) || e.myTags.some(tag => hero.weakTargets.includes(tag))) { appState.allyResults[hero.id].score -= 1.5; appState.allyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${e.name}${hero.weakDesc ? `: ${hero.weakDesc}` : ""} (-1.5)</span>`); }
+            });
+            activeAllies.forEach(aId => { 
+                if(aId === hero.id) return; const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
+                if (hero.synergyTargets.includes(aId) || a.myTags.some(tag => hero.synergyTargets.includes(tag))) { appState.allyResults[hero.id].score += 1.0; appState.allyResults[hero.id].details.push(`<span class="tag-synergy">【味方相性】with ${a.name}${hero.synergyDesc ? `: ${hero.synergyDesc}` : ""} (+1.0)</span>`); } 
+            });
 
-            if (activeEnvTags.length > 0 && hero.mapRuleTargets.some(tag => activeEnvTags.includes(tag))) { appState.enemyResults[hero.id].score += 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc ? `: ${hero.mapRuleDesc}` : ""} (+1.0)</span>`); }
-            if (activeEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => activeEnvTags.includes(tag))) { appState.enemyResults[hero.id].score -= 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc ? `: ${hero.badMapRuleDesc}` : ""} (-1.0)</span>`); }
-            activeAllies.forEach(aId => { const a = heroesDatabase.find(h => h.id === aId); if (!a) return; if (hero.antiTargets.includes(aId) || a.myTags.some(tag => hero.antiTargets.includes(tag))) { appState.enemyResults[hero.id].score += 1.5; appState.enemyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${a.name}${hero.antiDesc ? `: ${hero.antiDesc}` : ""} (+1.5)</span>`); } if (hero.weakTargets.includes(aId) || a.myTags.some(tag => hero.weakTargets.includes(tag))) { appState.enemyResults[hero.id].score -= 1.5; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${a.name}${hero.weakDesc ? `: ${hero.weakDesc}` : ""} (-1.5)</span>`); }});
-            activeEnemies.forEach(eId => { if(eId === hero.id) return; const e = heroesDatabase.find(h => h.id === eId); if (!e) return; if (hero.synergyTargets.includes(eId) || e.myTags.some(tag => hero.synergyTargets.includes(tag))) { appState.enemyResults[hero.id].score += 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-synergy">【敵同士相性】with ${e.name}${hero.synergyDesc ? `: ${hero.synergyDesc}` : ""} (+1.0)</span>`); } });
+            // ▼敵視点の評価 (enemyEnvTagsを使用)
+            if (enemyEnvTags.length > 0 && hero.mapRuleTargets.some(tag => enemyEnvTags.includes(tag))) { appState.enemyResults[hero.id].score += 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc ? `: ${hero.mapRuleDesc}` : ""} (+1.0)</span>`); }
+            if (enemyEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => enemyEnvTags.includes(tag))) { appState.enemyResults[hero.id].score -= 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc ? `: ${hero.badMapRuleDesc}` : ""} (-1.0)</span>`); }
+            
+            activeAllies.forEach(aId => { 
+                const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
+                if (hero.antiTargets.includes(aId) || a.myTags.some(tag => hero.antiTargets.includes(tag))) { appState.enemyResults[hero.id].score += 1.5; appState.enemyResults[hero.id].details.push(`<span class="tag-anti">【対面有利】vs ${a.name}${hero.antiDesc ? `: ${hero.antiDesc}` : ""} (+1.5)</span>`); } 
+                if (hero.weakTargets.includes(aId) || a.myTags.some(tag => hero.weakTargets.includes(tag))) { appState.enemyResults[hero.id].score -= 1.5; appState.enemyResults[hero.id].details.push(`<span class="tag-env-bad">【対面不利】vs ${a.name}${hero.weakDesc ? `: ${hero.weakDesc}` : ""} (-1.5)</span>`); }
+            });
+            activeEnemies.forEach(eId => { 
+                if(eId === hero.id) return; const e = heroesDatabase.find(h => h.id === eId); if (!e) return; 
+                if (hero.synergyTargets.includes(eId) || e.myTags.some(tag => hero.synergyTargets.includes(tag))) { appState.enemyResults[hero.id].score += 1.0; appState.enemyResults[hero.id].details.push(`<span class="tag-synergy">【敵同士相性】with ${e.name}${hero.synergyDesc ? `: ${hero.synergyDesc}` : ""} (+1.0)</span>`); } 
+            });
         });
 
         updateScoresUI(); 
-        updateSuggests(); 
-        calculateOptimalTeam(); // 真の最適解(5人)を計算して表示
+        calculateOptimalTeam(); // 第1・第2候補計算（味方用なのでallyEnvTagsと同じロジックを使用）
         renderDetailsPanel();
     }
 
-    function updateSuggests() {
-        ['enemy-tank', 'enemy-dps1', 'enemy-dps2', 'enemy-sup1', 'enemy-sup2'].forEach(slotId => {
-            const eId = appState.enemies[slotId];
-            const suggestBox = document.getElementById(`suggest-${slotId}`);
-            suggestBox.innerHTML = '';
-            if (!eId) return;
-
-            const eHero = heroesDatabase.find(h => h.id === eId);
-            if (!eHero) return;
-
-            let candidates = heroesDatabase.map(hero => {
-                let score = 0;
-                if (hero.antiTargets.includes(eId) || eHero.myTags.some(tag => hero.antiTargets.includes(tag))) { score += 1.5; }
-                if (hero.weakTargets.includes(eId) || eHero.myTags.some(tag => hero.weakTargets.includes(tag))) { score -= 1.5; }
-                return { hero, score };
-            }).filter(item => item.score > 0);
-
-            candidates.sort((a, b) => b.score - a.score);
-            candidates.slice(0, 3).forEach(item => {
-                suggestBox.innerHTML += `<div class="suggest-icon"><img src="images01/${item.hero.id}.png" onerror="this.style.display='none'"></div>`;
-            });
-        });
-
-        ['ally-tank', 'ally-dps1', 'ally-dps2', 'ally-sup1', 'ally-sup2'].forEach(slotId => {
-            const aId = appState.allies[slotId];
-            const suggestBox = document.getElementById(`suggest-${slotId}`);
-            suggestBox.innerHTML = '';
-            if (!aId) return;
-
-            const aHero = heroesDatabase.find(h => h.id === aId);
-            if (!aHero) return;
-
-            let candidates = heroesDatabase.map(hero => {
-                if (hero.id === aId) return { hero, score: 0 };
-                let score = 0;
-                if (hero.synergyTargets.includes(aId) || aHero.myTags.some(tag => hero.synergyTargets.includes(tag))) { score += 1.0; }
-                return { hero, score };
-            }).filter(item => item.score > 0);
-
-            candidates.sort((a, b) => b.score - a.score);
-            candidates.slice(0, 3).forEach(item => {
-                suggestBox.innerHTML += `<div class="suggest-icon"><img src="images01/${item.hero.id}.png" onerror="this.style.display='none'"></div>`;
-            });
-        });
-    }
-
-    // ★完全改修: 重複を除外し、単一の「真の最強構成（Tank1, DPS2, Sup2）」をズバッと出力
+    // ★重複を防止し、第1・第2候補（Top 2）を出力するアルゴリズム
     function calculateOptimalTeam() {
         if (heroesDatabase.length === 0) return;
 
         const activeEnemies = Object.values(appState.enemies).filter(v => v !== "");
 
-        // 1. 各キャラの基礎値を計算
+        // 味方の最適解を出すため、味方の環境タグを生成
         const baseScores = {};
         const currentRule = document.getElementById("match-rule").value.toLowerCase();
         const currentMapRaw = document.getElementById("match-map").value.toLowerCase();
         let currentMapBase = currentMapRaw.replace("_atk", "").replace("_def", "");
-        let currentSide = currentMapRaw.endsWith("_atk") ? "atk" : (currentMapRaw.endsWith("_def") ? "def" : "");
-        const activeEnvTags = [currentRule, currentMapBase, currentSide, currentMapRaw].filter(t => t !== "");
+        let allySide = currentMapRaw.endsWith("_atk") ? "atk" : (currentMapRaw.endsWith("_def") ? "def" : "");
+        const allyEnvTags = [currentRule, currentMapBase, allySide, currentMapRaw].filter(t => t !== "");
 
         heroesDatabase.forEach(hero => {
             let score = 0;
-            if (activeEnvTags.length > 0 && hero.mapRuleTargets.some(tag => activeEnvTags.includes(tag))) score += 1.0;
-            if (activeEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => activeEnvTags.includes(tag))) score -= 1.0;
+            if (allyEnvTags.length > 0 && hero.mapRuleTargets.some(tag => allyEnvTags.includes(tag))) score += 1.0;
+            if (allyEnvTags.length > 0 && hero.badMapRuleTargets.some(tag => allyEnvTags.includes(tag))) score -= 1.0;
 
             activeEnemies.forEach(eId => {
                 const e = heroesDatabase.find(h => h.id === eId);
@@ -353,17 +366,15 @@
             baseScores[hero.id] = score;
         });
 
-        // 2. ロール別に分離（ロールの枠を厳守）
         let tanks = heroesDatabase.filter(h => h.role === 'tank');
         let dps = heroesDatabase.filter(h => h.role === 'dps');
         let sups = heroesDatabase.filter(h => h.role === 'support');
 
         if (tanks.length === 0 || dps.length < 2 || sups.length < 2) return;
 
-        let bestComp = null;
-        let maxScore = -9999;
+        let top1 = { score: -9999, comp: null };
+        let top2 = { score: -9999, comp: null };
 
-        // 3. 総当たり計算 (j = i + 1, y = x + 1 でキャラの重複を完全に防止)
         for (let t of tanks) {
             for (let i = 0; i < dps.length; i++) {
                 for (let j = i + 1; j < dps.length; j++) { 
@@ -373,7 +384,6 @@
                             let comp = [t, dps[i], dps[j], sups[x], sups[y]];
                             let score = comp.reduce((sum, h) => sum + baseScores[h.id], 0);
 
-                            // 5人全員が場に出た状態でのシナジーを総計算
                             for (let a of comp) {
                                 for (let b of comp) {
                                     if (a.id === b.id) continue;
@@ -383,10 +393,11 @@
                                 }
                             }
 
-                            // 唯一の最適解（最高スコア）を更新
-                            if (score > maxScore) {
-                                maxScore = score;
-                                bestComp = comp;
+                            if (score > top1.score) {
+                                top2 = { score: top1.score, comp: top1.comp };
+                                top1 = { score: score, comp: comp };
+                            } else if (score > top2.score) {
+                                top2 = { score: score, comp: comp };
                             }
                         }
                     }
@@ -394,30 +405,34 @@
             }
         }
 
-        // 4. UIに唯一の「真の最強チーム」を出力
-        if (bestComp) {
-            let html = `
-            <div class="optimal-team-panel" style="flex-direction: column; gap: 8px; padding: 10px;">
-                <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 0.8rem; font-weight: bold; color: var(--text-main);">👑 最強の組み合わせ</span>
-                    <span class="score-badge ${maxScore > 0 ? "score-plus" : (maxScore < 0 ? "score-minus" : "score-zero")}" style="font-size: 0.8rem; padding: 2px 6px;">合算 ${maxScore > 0 ? `+${maxScore.toFixed(1)}` : maxScore.toFixed(1)}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-            `;
-            
-            bestComp.forEach(h => {
-                const color = h.role === 'tank' ? 'var(--accent-tank)' : h.role === 'dps' ? 'var(--accent-dps)' : 'var(--accent-support)';
+        if (top1.comp) {
+            let html = '';
+            [top1, top2].forEach((item, index) => {
+                if (!item.comp) return;
+                let badgeClass = item.score > 0 ? "score-plus" : (item.score < 0 ? "score-minus" : "score-zero");
+                let scoreText = item.score > 0 ? `+${item.score.toFixed(1)}` : item.score.toFixed(1);
+
                 html += `
-                    <div style="display:flex; flex-direction:column; align-items:center; width:45px;">
-                        <div style="width:40px; height:40px; border-radius:6px; overflow:hidden; border-bottom: 3px solid ${color};">
-                            <img src="images01/${h.id}.png" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'">
-                        </div>
-                        <div style="font-size:0.55rem; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:4px;">${h.name}</div>
+                <div class="optimal-team-panel" style="flex-direction: column; gap: 8px; padding: 10px;">
+                    <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.8rem; font-weight: bold; color: var(--text-main);">👑 候補 ${index + 1}</span>
+                        <span class="score-badge ${badgeClass}" style="font-size: 0.8rem; padding: 2px 6px;">合算 ${scoreText}</span>
                     </div>
+                    <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
                 `;
+                item.comp.forEach(h => {
+                    const color = h.role === 'tank' ? 'var(--accent-tank)' : h.role === 'dps' ? 'var(--accent-dps)' : 'var(--accent-support)';
+                    html += `
+                        <div style="display:flex; flex-direction:column; align-items:center; width:45px;">
+                            <div style="width:40px; height:40px; border-radius:6px; overflow:hidden; border-bottom: 3px solid ${color};">
+                                <img src="images01/${h.id}.png" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'">
+                            </div>
+                            <div style="font-size:0.55rem; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:4px;">${h.name}</div>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
             });
-            
-            html += `</div></div>`;
             document.getElementById('optimal-team-box').innerHTML = html;
         }
     }

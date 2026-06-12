@@ -275,9 +275,6 @@
             currentMapBase = currentMapRaw.replace("_def", ""); allySide = "def"; enemySide = "atk"; enemyMapRaw = currentMapBase + "_atk";
         }
 
-        const allyEnvTags = [currentRule, currentMapBase, allySide, allyMapRaw].filter(t => t !== "");
-        const enemyEnvTags = [currentRule, currentMapBase, enemySide, enemyMapRaw].filter(t => t !== "");
-
         const activeAllies = Object.values(appState.allies).filter(v => v !== "");
         const activeEnemies = Object.values(appState.enemies).filter(v => v !== "");
 
@@ -345,7 +342,7 @@
             activeAllies.forEach(aId => { 
                 if(aId === hero.id) return; const a = heroesDatabase.find(h => h.id === aId); if (!a) return; 
                 
-                // シナジー（名指し ＞ タグ の重複回避）
+                // シナジー
                 let synScore = 0; let descSyn = "";
                 if (hero.synergyTargets.includes(aId)) { synScore += 1.0; descSyn = hero.synergyDesc; }
                 else if (a.myTags.some(tag => hero.synergyTargets.includes(tag))) { synScore += 0.5; }
@@ -357,7 +354,7 @@
                     appState.allyResults[hero.id].details.push(`<span class="tag-synergy">【味方相性】with ${a.name}${descSyn ? `: ${descSyn}` : ""} (+${synScore.toFixed(1)})</span>`); 
                 } 
 
-                // ★アンチシナジーの重複回避（名指し ＞ タグ）
+                // ★ アンチシナジー（名指し ＞ タグ）
                 let badSynScore = 0; let descBadSyn = "";
                 if (hero.badSynergyTargets.includes(aId)) { badSynScore += 2.0; descBadSyn = hero.badSynergyDesc; }
                 else if (a.myTags.some(tag => hero.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
@@ -370,16 +367,21 @@
                 }
             });
 
-            // ★ 味方視点：サポートのヒール量不足チェック（大+小、中+中未満ならペナルティ）
+            // ★ 味方視点：サポートのヒール量不足チェック（一人目の選択が二人目の評価を変える）
             if (hero.role === 'support') {
                 let myHeal = getHealVal(hero.myTags);
                 let otherSupId = activeAllies.find(id => id !== hero.id && heroesDatabase.find(h => h.id === id)?.role === 'support');
                 if (otherSupId && myHeal > 0) {
                     let otherSup = heroesDatabase.find(h => h.id === otherSupId);
                     let otherHeal = getHealVal(otherSup.myTags);
-                    if (otherHeal > 0 && (myHeal + otherHeal < 4)) {
-                        appState.allyResults[hero.id].score -= 1.5;
-                        appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy">【回復量不足】タンクを支えきれない構成 (-1.5)</span>`);
+                    if (otherHeal > 0) {
+                        if (myHeal + otherHeal < 4) {
+                            appState.allyResults[hero.id].score -= 5.0; // 超重いペナルティ
+                            appState.allyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【致命的欠陥】ヒール量が絶望的 (-5.0)</span>`);
+                        } else {
+                            appState.allyResults[hero.id].score += 0.5; // 相方の大ヒールに助けられたボーナス
+                            appState.allyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方のヒール量でカバー可 (+0.5)</span>`);
+                        }
                     }
                 }
             }
@@ -427,7 +429,7 @@
                 else if (a.myTags.some(tag => hero.weakTargets.includes(tag))) { weakScore += 1.0; }
                 
                 if (a.antiTargets.includes(hero.id)) { weakScore += 1.5; descWeak = descWeak || a.antiDesc; }
-                else if (a.myTags.some(tag => a.antiTargets.includes(tag))) { weakScore += 1.0; }
+                else if (hero.myTags.some(tag => a.antiTargets.includes(tag))) { weakScore += 1.0; }
 
                 if (antiScore > 0) {
                     appState.enemyResults[hero.id].score += antiScore; 
@@ -454,7 +456,7 @@
                     appState.enemyResults[hero.id].details.push(`<span class="tag-synergy">【敵同士相性】with ${e.name}${descSyn ? `: ${descSyn}` : ""} (+${synScore.toFixed(1)})</span>`); 
                 } 
 
-                // ★ アンチシナジー（名指し ＞ タグ）
+                // ★ アンチシナジー
                 let badSynScore = 0; let descBadSyn = "";
                 if (hero.badSynergyTargets.includes(eId)) { badSynScore += 2.0; descBadSyn = hero.badSynergyDesc; }
                 else if (e.myTags.some(tag => hero.badSynergyTargets.includes(tag))) { badSynScore += 1.5; }
@@ -474,9 +476,14 @@
                 if (otherSupId && myHeal > 0) {
                     let otherSup = heroesDatabase.find(h => h.id === otherSupId);
                     let otherHeal = getHealVal(otherSup.myTags);
-                    if (otherHeal > 0 && (myHeal + otherHeal < 4)) {
-                        appState.enemyResults[hero.id].score -= 1.5;
-                        appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy">【回復量不足】タンクを支えきれない構成 (-1.5)</span>`);
+                    if (otherHeal > 0) {
+                        if (myHeal + otherHeal < 4) {
+                            appState.enemyResults[hero.id].score -= 5.0;
+                            appState.enemyResults[hero.id].details.push(`<span class="tag-anti-synergy" style="color:#ef4444; font-weight:bold;">【致命的欠陥】ヒール量が絶望的 (-5.0)</span>`);
+                        } else {
+                            appState.enemyResults[hero.id].score += 0.5;
+                            appState.enemyResults[hero.id].details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方のヒール量でカバー可 (+0.5)</span>`);
+                        }
                     }
                 }
             }
@@ -616,14 +623,14 @@
                                 for (let b of comp) {
                                     if (a.id === b.id) continue;
                                     
-                                    // シナジー（名指し ＞ タグ）
+                                    // シナジー
                                     if (a.synergyTargets.includes(b.id)) {
                                         score += 1.0;
                                     } else if (b.myTags.some(tag => a.synergyTargets.includes(tag))) {
                                         score += 0.5;
                                     }
                                     
-                                    // ★ アンチシナジーの重複回避（名指し ＞ タグ）
+                                    // ★ アンチシナジー
                                     if (a.badSynergyTargets.includes(b.id)) {
                                         score -= 2.0;
                                     } else if (b.myTags.some(tag => a.badSynergyTargets.includes(tag))) {
@@ -632,11 +639,15 @@
                                 }
                             }
                             
-                            // ★ AI推奨チームのヒール量ペナルティ計算（大+小、中+中 未満なら一撃減点）
+                            // ★ AI推奨チームのヒール量ペナルティ計算
                             let h1 = getHealVal(sups[x].myTags);
                             let h2 = getHealVal(sups[y].myTags);
-                            if (h1 > 0 && h2 > 0 && (h1 + h2 < 4)) {
-                                score -= 3.0; 
+                            if (h1 > 0 && h2 > 0) {
+                                if (h1 + h2 < 4) {
+                                    score -= 10.0; // AIが絶対に選ばないレベルの超特大ペナルティ
+                                } else {
+                                    score += 1.0;  // ヒール要件を満たした美しい構成へのボーナス
+                                }
                             }
 
                             if (score > maxScore) {

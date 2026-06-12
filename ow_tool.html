@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OW スマホ特化シミュレーター + OpenCV</title>
+    <title>OWメタツール</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -97,7 +97,7 @@
 
 <header>
     <div class="header-top">
-        <h1>OW 構成＆環境シミュレーター</h1>
+        <h1>OWメタツール</h1>
         <button class="reset-btn" onclick="resetAll()">↻ リセット</button>
     </div>
     <div id="load-status">データを読み込み中...</div>
@@ -230,7 +230,7 @@
 
             heroesDatabase.forEach(hero => {
                 const templImg = new Image();
-                templImg.src = `images/${hero.id}.png`; 
+                templImg.src = `images02/${hero.id}.png`; 
                 try {
                     if(!templImg.width) return;
                     templateCanvas.width = templImg.width;
@@ -275,7 +275,7 @@
             if (totalFound > 0) {
                 alert(`画像解析が完了しました！\n（検出: タンク${foundTanks.length}体, DPS${foundDps.length}体, サポ${foundSupports.length}体）`);
             } else {
-                alert(`解析完了しましたが、キャラを検出できませんでした。\n（最高一致スコア: ${maxMatchScore.toFixed(2)} / 必要なスコア: ${MATCH_THRESHOLD}）\n\n【ヒント】\nカメラで撮ったアイコンの大きさと、imagesフォルダ内のアイコンの大きさが違いすぎるか、画面の反射が原因です。スマホをモニターに近づけたり遠ざけたりして撮り直してみてください。`);
+                alert(`解析完了しましたが、キャラを検出できませんでした。\n（最高一致スコア: ${maxMatchScore.toFixed(2)} / 必要なスコア: ${MATCH_THRESHOLD}）\n\n【ヒント】\nカメラで撮ったアイコンの大きさと、images02フォルダ内のアイコンの大きさが違いすぎるか、画面の反射が原因です。スマホをモニターに近づけたり遠ざけたりして撮り直してみてください。`);
             }
 
         } catch (error) {
@@ -293,7 +293,7 @@
         const nameBox = document.getElementById(`name-${slotId}`);
         const h = heroesDatabase.find(x => x.id === heroId);
         if(h) {
-            imgBox.innerHTML = `<img src="images/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`;
+            imgBox.innerHTML = `<img src="images02/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`;
             nameBox.innerText = h.name;
         }
     }
@@ -453,7 +453,7 @@
         candidates.sort((a, b) => b.score - a.score);
         
         candidates.forEach(item => {
-            const h = item.hero; const iconPath = `images/${h.id}.png`;
+            const h = item.hero; const iconPath = `images02/${h.id}.png`;
             let badgeClass = "score-zero"; let scoreText = item.score > 0 ? `+${item.score.toFixed(1)}` : item.score.toFixed(1); 
             if (item.score > 0) badgeClass = "score-plus"; if (item.score < 0) badgeClass = "score-minus"; 
             let scoreHtml = `<span class="score-badge ${badgeClass}">${scoreText}</span>`;
@@ -465,7 +465,7 @@
     function selectHero(heroId) {
         if (currentModalSlotId.startsWith('enemy-')) { appState.enemies[currentModalSlotId] = heroId; } else { appState.allies[currentModalSlotId] = heroId; }
         const imgBox = document.getElementById(`img-${currentModalSlotId}`); const nameBox = document.getElementById(`name-${currentModalSlotId}`);
-        if (heroId) { const h = heroesDatabase.find(x => x.id === heroId); imgBox.innerHTML = `<img src="images/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; nameBox.innerText = h.name; } 
+        if (heroId) { const h = heroesDatabase.find(x => x.id === heroId); imgBox.innerHTML = `<img src="images02/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; nameBox.innerText = h.name; } 
         else { imgBox.innerHTML = currentModalSlotId.includes('tank') ? 'T' : currentModalSlotId.includes('dps') ? 'D' : 'S'; nameBox.innerText = "未選択"; }
         closeModal(); updateSimulation();
     }

@@ -779,5 +779,24 @@
 
     window.onload = loadSpreadsheetData;
 </script>
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCXKSY9iTcdGWBlAy0tGHjw4GXnGiK-UxA",
+    authDomain: "ow-tool.firebaseapp.com",
+    projectId: "ow-tool",
+    storageBucket: "ow-tool.firebasestorage.app",
+    messagingSenderId: "878897449164",
+    appId: "1:878897449164:web:7b827457783a697def9a69"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
 </body>
 </html>

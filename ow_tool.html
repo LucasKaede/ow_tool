@@ -424,11 +424,11 @@
                 if (otherHeal > 0) {
                     let total = myHeal + otherHeal;
                     if (total >= 4) {
-                        score += 3.0; details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方サポとの相乗効果 (+3.0)</span>`);
+                        score += 2.0; details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方サポとの相乗効果 (+3.0)</span>`);
                     } else if (total === 3) {
-                        score -= 3.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【回復量低下】中＋小ヒール (-3.0)</span>`);
+                        score -= 2.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【回復量低下】中＋小ヒール (-3.0)</span>`);
                     } else if (total <= 2) {
-                        score -= 4.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【致命的欠陥】小＋小ヒール (-4.0)</span>`);
+                        score -= 3.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【致命的欠陥】小＋小ヒール (-4.0)</span>`);
                     }
                 }
             }

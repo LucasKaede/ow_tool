@@ -298,10 +298,6 @@
                 const parseTargets = (col) => col ? col.split(",").map(t => t.trim().toLowerCase()).filter(t => t !== "") : [];
                 if(id) {
                     let heroName = columns[1];
-                    // 男体化対応
-                    if (id === 'tracer' || id === 'mei') {
-                        heroName += ' (♂)';
-                    }
                     heroesDatabase.push({ 
                         id, name: heroName, role: columns[2]?.toLowerCase(), 
                         nemesisTargets: parseTargets(columns[3]), nemesisDesc: columns[4] || "", 
@@ -428,7 +424,7 @@
                 if (otherHeal > 0) {
                     let total = myHeal + otherHeal;
                     if (total >= 4) {
-                        score += 1.0; details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方サポとの相乗効果 (+1.0)</span>`);
+                        score += 3.0; details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方サポとの相乗効果 (+3.0)</span>`);
                     } else if (total === 3) {
                         score -= 3.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【回復量低下】中＋小ヒール (-3.0)</span>`);
                     } else if (total <= 2) {

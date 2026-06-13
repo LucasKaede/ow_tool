@@ -781,7 +781,7 @@
 </script>
 <script type="module">
   // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-database.js";
   // TODO: Add SDKs for Firebase products that you want to use
   // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -794,9 +794,37 @@
     messagingSenderId: "878897449164",
     appId: "1:878897449164:web:7b827457783a697def9a69"
   };
+  const app = initializeApp(firebaseConfig);
 
   // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
+// 2. ここから下を追加！ ----------------------------------
+
+  // データベースの準備
+  const db = getDatabase(app);
+
+  // クラウド上のデータの保存場所（ファイル名のようなもの）を決める
+  const dbRef = ref(db, 'ow_match/current_picks');
+
+  // 【受信】誰かがFirebaseのデータを更新したら、自分の画面に反映する
+  onValue(dbRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      console.log("Firebaseからデータを受信しました:", data);
+      
+      // ★ここに「受信したデータを使って、画面の表示を切り替える」処理を書きます
+      // 例: document.getElementById('enemy_tank').value = data.tank;
+    }
+  });
+
+  // 【送信】自分が画面で入力・操作をした時に、Firebaseにデータを送るための関数
+  // ★この関数を、ご自身のツールの「入力した瞬間」に発動するように設定します
+  window.sendPicksToFirebase = function(tankName, dpsName, supportName) {
+    set(dbRef, {
+      tank: tankName,
+      dps: dpsName,
+      support: supportName
+    });
+  };
 </script>
 </body>
 </html>

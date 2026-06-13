@@ -103,7 +103,7 @@
 
 <header>
     <div class="header-top">
-        <h1>OW メタツール</h1>
+        <h1>OW メタツール~ONLINE~</h1>
         <button class="reset-btn" onclick="resetAll()">↻ リセット</button>
     </div>
     <div id="load-status">データを読み込み中...</div>
@@ -188,15 +188,12 @@
     </div>
 </div>
 <script type="module">
-    // 1. Firebaseの機能を読み込む
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // 2. ★ここに先ほどコピーした firebaseConfig を貼り付けてください
-const firebaseConfig = {
+    const firebaseConfig = {
         apiKey: "AIzaSyCXKSY9iTcdGWBlAy0tGHjw4GXnGiK-UxA",
         authDomain: "ow-tool.firebaseapp.com",
-        // ▼【超重要】データベースのURLを追加しています！
         databaseURL: "https://ow-tool-default-rtdb.asia-southeast1.firebasedatabase.app/", 
         projectId: "ow-tool",
         storageBucket: "ow-tool.firebasestorage.app",
@@ -220,57 +217,53 @@ const firebaseConfig = {
 
     let heroesDatabase = [];
     let heroesMap = {};
-    let isSyncing = false; // 無限ループ（送信と受信の繰り返し）を防ぐためのフラグ
+    let isSyncing = false; 
 
     // ==========================================
-    // Firebase 送受信ロジック
+    // Firebase 受信ロジック（関数化して待機させる）
     // ==========================================
+    function startFirebaseSync() {
+        onValue(dbRef, (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
 
-    // 【受信】クラウドのデータが変わったら画面を更新
-    onValue(dbRef, (snapshot) => {
-        const data = snapshot.val();
-        if (!data) return;
+            isSyncing = true; 
 
-        isSyncing = true; // 同期中フラグをオン
+            if (data.enemies) appState.enemies = data.enemies;
+            if (data.allies) appState.allies = data.allies;
 
-        // 状態を上書き
-        if (data.enemies) appState.enemies = data.enemies;
-        if (data.allies) appState.allies = data.allies;
-
-        // マップとルールのUIを上書き
-        if (data.rule !== undefined) {
-            document.getElementById("match-rule").value = data.rule;
-            updateMapOptions(); // ルールに合わせてマップの選択肢を再生成
-        }
-        if (data.map !== undefined) {
-            document.getElementById("match-map").value = data.map;
-        }
-
-        // キャラクターアイコンと名前のUIを強制更新
-        ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2', 'ally-tank','ally-dps1','ally-dps2','ally-sup1','ally-sup2'].forEach(slotId => {
-            const heroId = slotId.startsWith('enemy-') ? appState.enemies[slotId] : appState.allies[slotId];
-            const imgBox = document.getElementById(`img-${slotId}`);
-            const nameBox = document.getElementById(`name-${slotId}`);
-            
-            if (heroId && heroesMap[heroId]) { 
-                const h = heroesMap[heroId];
-                imgBox.innerHTML = `<img src="images01/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; 
-                nameBox.innerText = h.name; 
-            } else { 
-                imgBox.innerHTML = slotId.includes('tank') ? 'T' : slotId.includes('dps') ? 'D' : 'S'; 
-                nameBox.innerText = "未選択"; 
+            if (data.rule !== undefined) {
+                document.getElementById("match-rule").value = data.rule;
+                updateMapOptions(); 
             }
+            if (data.map !== undefined) {
+                document.getElementById("match-map").value = data.map;
+            }
+
+            ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2', 'ally-tank','ally-dps1','ally-dps2','ally-sup1','ally-sup2'].forEach(slotId => {
+                const heroId = slotId.startsWith('enemy-') ? appState.enemies[slotId] : appState.allies[slotId];
+                const imgBox = document.getElementById(`img-${slotId}`);
+                const nameBox = document.getElementById(`name-${slotId}`);
+                
+                if (heroId && heroesMap[heroId]) { 
+                    const h = heroesMap[heroId];
+                    imgBox.innerHTML = `<img src="images01/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; 
+                    nameBox.innerText = h.name; 
+                } else { 
+                    imgBox.innerHTML = slotId.includes('tank') ? 'T' : slotId.includes('dps') ? 'D' : 'S'; 
+                    nameBox.innerText = "未選択"; 
+                }
+            });
+
+            updateSimulation(); 
+
+            setTimeout(() => { isSyncing = false; }, 50);
         });
-
-        updateSimulation(); // アンチピック等の再計算を走らせる
-
-        // 計算処理が終わった頃に同期中フラグをオフ
-        setTimeout(() => { isSyncing = false; }, 50);
-    });
+    }
 
     // 【送信】手元の操作をクラウドに送信
     function pushDataToFirebase() {
-        if (isSyncing) return; // 誰かからデータを受け取って更新している最中は送信しない
+        if (isSyncing) return; 
         set(dbRef, {
             rule: document.getElementById("match-rule").value,
             map: document.getElementById("match-map").value,
@@ -280,7 +273,7 @@ const firebaseConfig = {
     }
 
     // ==========================================
-    // 既存のツールロジック（一部改修）
+    // 既存のツールロジック
     // ==========================================
 
     function resetAll() {
@@ -312,7 +305,7 @@ const firebaseConfig = {
             
         renderDetailsPanel();
         updateSimulation();
-        pushDataToFirebase(); // ★リセット状態を全員に共有
+        pushDataToFirebase(); 
     }
 
     const mapDatabase = {
@@ -398,7 +391,12 @@ const firebaseConfig = {
             heroesDatabase.forEach(h => heroesMap[h.id] = h);
 
             document.getElementById("load-status").innerText = `✓ データ読込完了（${heroesDatabase.length}体）`;
-            updateMapOptions(); updateSimulation();
+            updateMapOptions(); 
+            
+            // ★【ここがポイント】キャラデータの読み込みが完了してからFirebaseの同期を開始する
+            startFirebaseSync();
+            
+            updateSimulation();
         } catch (error) { document.getElementById("load-status").innerText = "エラー: データの読み込みに失敗しました。"; }
     }
 
@@ -834,15 +832,11 @@ const firebaseConfig = {
         
         closeModal(); 
         updateSimulation();
-        pushDataToFirebase(); // ★変更を全員に共有
+        pushDataToFirebase(); 
     }
 
     function closeModal(event) { if (event && event.target !== document.getElementById('hero-modal')) return; document.getElementById("hero-modal").classList.remove("is-active"); }
 
-    // ==========================================
-    // モジュール化に伴うグローバル関数の登録
-    // ==========================================
-    // <script type="module"> に変更したため、HTMLの onclick 等から呼び出せるように window に登録します
     window.resetAll = resetAll;
     window.updateMapOptions = updateMapOptions;
     window.updateSimulation = updateSimulation;
@@ -851,11 +845,9 @@ const firebaseConfig = {
     window.selectHero = selectHero;
     window.closeModal = closeModal;
 
-    // 初期化処理
     window.onload = () => {
         loadSpreadsheetData();
         
-        // プルダウン変更時にもFirebaseへ送信するようイベントを追加
         document.getElementById("match-rule").addEventListener("change", pushDataToFirebase);
         document.getElementById("match-map").addEventListener("change", pushDataToFirebase);
     };

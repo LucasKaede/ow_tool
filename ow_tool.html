@@ -187,8 +187,25 @@
         <div class="modal-list" id="modal-list"></div>
     </div>
 </div>
+<script type="module">
+    // 1. Firebaseの機能を読み込む
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-<script>
+    // 2. ★ここに先ほどコピーした firebaseConfig を貼り付けてください
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "ow-tool.firebaseapp.com",
+        projectId: "ow-tool",
+        storageBucket: "ow-tool.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const dbRef = ref(db, 'ow_match/current_state');
+
     const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHb34RcBctjEcBeNrixnFu_sfbF7B2sAjFkWVIHcqKcLhmurraDyS2thmJbGTlrF3WNUom2go4P66X/pub?output=csv";
 
     const appState = {
@@ -200,7 +217,69 @@
     };
 
     let heroesDatabase = [];
-    let heroesMap = {}; // 高速検索用のマップ
+    let heroesMap = {};
+    let isSyncing = false; // 無限ループ（送信と受信の繰り返し）を防ぐためのフラグ
+
+    // ==========================================
+    // Firebase 送受信ロジック
+    // ==========================================
+
+    // 【受信】クラウドのデータが変わったら画面を更新
+    onValue(dbRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        isSyncing = true; // 同期中フラグをオン
+
+        // 状態を上書き
+        if (data.enemies) appState.enemies = data.enemies;
+        if (data.allies) appState.allies = data.allies;
+
+        // マップとルールのUIを上書き
+        if (data.rule !== undefined) {
+            document.getElementById("match-rule").value = data.rule;
+            updateMapOptions(); // ルールに合わせてマップの選択肢を再生成
+        }
+        if (data.map !== undefined) {
+            document.getElementById("match-map").value = data.map;
+        }
+
+        // キャラクターアイコンと名前のUIを強制更新
+        ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2', 'ally-tank','ally-dps1','ally-dps2','ally-sup1','ally-sup2'].forEach(slotId => {
+            const heroId = slotId.startsWith('enemy-') ? appState.enemies[slotId] : appState.allies[slotId];
+            const imgBox = document.getElementById(`img-${slotId}`);
+            const nameBox = document.getElementById(`name-${slotId}`);
+            
+            if (heroId && heroesMap[heroId]) { 
+                const h = heroesMap[heroId];
+                imgBox.innerHTML = `<img src="images01/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; 
+                nameBox.innerText = h.name; 
+            } else { 
+                imgBox.innerHTML = slotId.includes('tank') ? 'T' : slotId.includes('dps') ? 'D' : 'S'; 
+                nameBox.innerText = "未選択"; 
+            }
+        });
+
+        updateSimulation(); // アンチピック等の再計算を走らせる
+
+        // 計算処理が終わった頃に同期中フラグをオフ
+        setTimeout(() => { isSyncing = false; }, 50);
+    });
+
+    // 【送信】手元の操作をクラウドに送信
+    function pushDataToFirebase() {
+        if (isSyncing) return; // 誰かからデータを受け取って更新している最中は送信しない
+        set(dbRef, {
+            rule: document.getElementById("match-rule").value,
+            map: document.getElementById("match-map").value,
+            enemies: appState.enemies,
+            allies: appState.allies
+        });
+    }
+
+    // ==========================================
+    // 既存のツールロジック（一部改修）
+    // ==========================================
 
     function resetAll() {
         if(!confirm("編成と環境をすべてリセットしますか？")) return;
@@ -231,6 +310,7 @@
             
         renderDetailsPanel();
         updateSimulation();
+        pushDataToFirebase(); // ★リセット状態を全員に共有
     }
 
     const mapDatabase = {
@@ -312,7 +392,6 @@
                 }
             }
             
-            // 高速検索用のマップを構築
             heroesMap = {};
             heroesDatabase.forEach(h => heroesMap[h.id] = h);
 
@@ -325,7 +404,6 @@
         let score = 0;
         let details = [];
 
-        // 1. マップ適正
         if (currentMapBase && (hero.mapRuleTargets.includes(currentMapBase) || hero.mapRuleTargets.includes(mapRaw))) {
             score += 1.5; details.push(`<span class="tag-env">【環境得意】${hero.mapRuleDesc} (+1.5)</span>`);
         } else if (currentRule && mapSide && hero.mapRuleTargets.includes(currentRule + "_" + mapSide)) {
@@ -346,7 +424,6 @@
             score -= 0.5; details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc} (-0.5)</span>`);
         }
 
-        // 2. 対面有利・不利
         testEnemies.forEach(eId => {
             const e = heroesMap[eId];
             if(!e) return;
@@ -377,7 +454,6 @@
             if (weakScore > 0) { score -= weakScore; details.push(`<span class="tag-anti-bad">【絶望的対面】vs ${e.name}${descWeak} (-${weakScore.toFixed(1)})</span>`); }
         });
 
-        // 3. 味方シナジー・バッドシナジー
         testAllies.forEach(aId => {
             if(aId === hero.id) return;
             const a = heroesMap[aId];
@@ -413,7 +489,6 @@
             }
         });
 
-        // 4. サポートのヒール量ルール
         if (hero.role === 'support') {
             let myHeal = hero.myTags.includes('heal_high') ? 3 : (hero.myTags.includes('heal_med') ? 2 : (hero.myTags.includes('heal_low') ? 1 : 0));
             let otherSupId = testAllies.find(id => id !== hero.id && heroesMap[id]?.role === 'support');
@@ -424,11 +499,11 @@
                 if (otherHeal > 0) {
                     let total = myHeal + otherHeal;
                     if (total >= 4) {
-                        score += 2.0; details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方サポとの相乗効果 (+3.0)</span>`);
+                        score += 2.0; details.push(`<span class="tag-synergy" style="color:#34d399; font-weight:bold;">【回復バランス良好】相方サポとの相乗効果 (+2.0)</span>`);
                     } else if (total === 3) {
-                        score -= 2.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【回復量低下】中＋小ヒール (-3.0)</span>`);
+                        score -= 2.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【回復量低下】中＋小ヒール (-2.0)</span>`);
                     } else if (total <= 2) {
-                        score -= 3.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【致命的欠陥】小＋小ヒール (-4.0)</span>`);
+                        score -= 3.0; details.push(`<span class="tag-anti-bad" style="font-weight:bold;">【致命的欠陥】小＋小ヒール (-3.0)</span>`);
                     }
                 }
             }
@@ -485,16 +560,13 @@
 
             let scoredHeroes = heroesDatabase.map(hero => {
                 let score = 0;
-                
                 let nemesisAdv = 2.0, weakAdv = 1.5;
                 let nemesisDis = 2.0, weakDis = 1.5;
 
                 if (hero.role === 'tank' && eHero.role === 'tank') {
-                    nemesisAdv = 3.0; weakAdv = 2.0;
-                    nemesisDis = 3.0; weakDis = 2.0;
+                    nemesisAdv = 3.0; weakAdv = 2.0; nemesisDis = 3.0; weakDis = 2.0;
                 } else if (hero.role === 'support' || eHero.role === 'support') {
-                    nemesisAdv = 1.0; weakAdv = 0.5;
-                    nemesisDis = 2.0; weakDis = 1.0;
+                    nemesisAdv = 1.0; weakAdv = 0.5; nemesisDis = 2.0; weakDis = 1.0;
                 }
 
                 if (eHero.nemesisTargets.includes(hero.id)) score += nemesisAdv;
@@ -545,14 +617,12 @@
 
         if (tanks.length === 0 || dps.length < 2 || sups.length < 2) return;
 
-        // 高速化1: 各キャラの「マップ適正＋対敵適正（ベーススコア）」を事前計算
         let baseScores = {};
         heroesDatabase.forEach(hero => {
             let res = evaluateHeroScore(hero, false, [], activeEnemies, currentMapBase, currentRule, allySide, currentMapRaw);
             baseScores[hero.id] = res.score;
         });
 
-        // 高速化2: 味方同士の「シナジースコア行列」を事前計算
         let synergyMatrix = {};
         heroesDatabase.forEach(h1 => {
             synergyMatrix[h1.id] = {};
@@ -573,7 +643,6 @@
             });
         });
 
-        // 高速化3: サポート同士の「ヒール量スコア行列」を事前計算
         let healMatrix = {};
         sups.forEach(s1 => {
             healMatrix[s1.id] = {};
@@ -596,33 +665,23 @@
         let bestComp = null;
         let maxScore = -9999;
 
-        // 高速化4: 行列を利用した高速総当たり
         for (let i = 0; i < tanks.length; i++) {
             let t = tanks[i]; let tBase = baseScores[t.id]; let synT = synergyMatrix[t.id];
-            
             for (let j = 0; j < dps.length; j++) {
                 let d1 = dps[j]; let d1Base = baseScores[d1.id]; let synD1 = synergyMatrix[d1.id];
-                
                 for (let k = j + 1; k < dps.length; k++) {
                     let d2 = dps[k]; let d2Base = baseScores[d2.id]; let synD2 = synergyMatrix[d2.id];
-                    
                     for (let x = 0; x < sups.length; x++) {
                         let s1 = sups[x]; let s1Base = baseScores[s1.id]; let synS1 = synergyMatrix[s1.id]; let healS1 = healMatrix[s1.id];
-                        
                         for (let y = x + 1; y < sups.length; y++) {
                             let s2 = sups[y]; let synS2 = synergyMatrix[s2.id];
                             
-                            // ベーススコア合算
                             let score = tBase + d1Base + d2Base + s1Base + baseScores[s2.id];
-
-                            // 各シナジースコア合算
                             score += synT[d1.id] + synT[d2.id] + synT[s1.id] + synT[s2.id];
                             score += synD1[t.id] + synD1[d2.id] + synD1[s1.id] + synD1[s2.id];
                             score += synD2[t.id] + synD2[d1.id] + synD2[s1.id] + synD2[s2.id];
                             score += synS1[t.id] + synS1[d1.id] + synS1[d2.id] + synS1[s2.id];
                             score += synS2[t.id] + synS2[d1.id] + synS2[d2.id] + synS2[s1.id];
-                            
-                            // ヒールバランス合算
                             score += healS1[s2.id] + healMatrix[s2.id][s1.id];
 
                             if (score > maxScore) { 
@@ -773,58 +832,32 @@
         
         closeModal(); 
         updateSimulation();
+        pushDataToFirebase(); // ★変更を全員に共有
     }
 
     function closeModal(event) { if (event && event.target !== document.getElementById('hero-modal')) return; document.getElementById("hero-modal").classList.remove("is-active"); }
 
-    window.onload = loadSpreadsheetData;
-</script>
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-database.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+    // ==========================================
+    // モジュール化に伴うグローバル関数の登録
+    // ==========================================
+    // <script type="module"> に変更したため、HTMLの onclick 等から呼び出せるように window に登録します
+    window.resetAll = resetAll;
+    window.updateMapOptions = updateMapOptions;
+    window.updateSimulation = updateSimulation;
+    window.handleImageTap = handleImageTap;
+    window.selectFrame = selectFrame;
+    window.selectHero = selectHero;
+    window.closeModal = closeModal;
 
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyCXKSY9iTcdGWBlAy0tGHjw4GXnGiK-UxA",
-    authDomain: "ow-tool.firebaseapp.com",
-    projectId: "ow-tool",
-    storageBucket: "ow-tool.firebasestorage.app",
-    messagingSenderId: "878897449164",
-    appId: "1:878897449164:web:7b827457783a697def9a69"
-  };
-  const app = initializeApp(firebaseConfig);
+    // 初期化処理
+    window.onload = () => {
+        loadSpreadsheetData();
+        
+        // プルダウン変更時にもFirebaseへ送信するようイベントを追加
+        document.getElementById("match-rule").addEventListener("change", pushDataToFirebase);
+        document.getElementById("match-map").addEventListener("change", pushDataToFirebase);
+    };
 
-  // Initialize Firebase
-// 2. ここから下を追加！ ----------------------------------
-
-  // データベースの準備
-  const db = getDatabase(app);
-
-  // クラウド上のデータの保存場所（ファイル名のようなもの）を決める
-  const dbRef = ref(db, 'ow_match/current_picks');
-
-  // 【受信】誰かがFirebaseのデータを更新したら、自分の画面に反映する
-  onValue(dbRef, (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-      console.log("Firebaseからデータを受信しました:", data);
-      
-      // ★ここに「受信したデータを使って、画面の表示を切り替える」処理を書きます
-      // 例: document.getElementById('enemy_tank').value = data.tank;
-    }
-  });
-
-  // 【送信】自分が画面で入力・操作をした時に、Firebaseにデータを送るための関数
-  // ★この関数を、ご自身のツールの「入力した瞬間」に発動するように設定します
-  window.sendPicksToFirebase = function(tankName, dpsName, supportName) {
-    set(dbRef, {
-      tank: tankName,
-      dps: dpsName,
-      support: supportName
-    });
-  };
 </script>
 </body>
 </html>

@@ -200,8 +200,8 @@
     };
 
     let heroesDatabase = [];
+    let heroesMap = {}; // ★ 検索速度をO(1)にするためのハッシュマップ
 
-    // ★ リセット関数（絶対に動くように要素を明示的にクリア）
     function resetAll() {
         if(!confirm("編成と環境をすべてリセットしますか？")) return;
         
@@ -297,8 +297,13 @@
                 const id = columns[0]?.toLowerCase();
                 const parseTargets = (col) => col ? col.split(",").map(t => t.trim().toLowerCase()).filter(t => t !== "") : [];
                 if(id) {
+                    let heroName = columns[1];
+                    // 特別対応：特定キャラクターの性別反転表記
+                    if (id === 'tracer' || id === 'mei') {
+                        heroName += ' (♂)';
+                    }
                     heroesDatabase.push({ 
-                        id, name: columns[1], role: columns[2]?.toLowerCase(), 
+                        id, name: heroName, role: columns[2]?.toLowerCase(), 
                         nemesisTargets: parseTargets(columns[3]), nemesisDesc: columns[4] || "", 
                         weakTargets: parseTargets(columns[5]), weakDesc: columns[6] || "",
                         goodSynergyTargets: parseTargets(columns[7]), goodSynergyDesc: columns[8] || "",
@@ -310,6 +315,11 @@
                     });
                 }
             }
+            
+            // ★ 高速検索用のマップを構築
+            heroesMap = {};
+            heroesDatabase.forEach(h => heroesMap[h.id] = h);
+
             document.getElementById("load-status").innerText = `✓ データ読込完了（${heroesDatabase.length}体）`;
             updateMapOptions(); updateSimulation();
         } catch (error) { document.getElementById("load-status").innerText = "エラー: データの読み込みに失敗しました。"; }
@@ -342,20 +352,20 @@
 
         // 2. 対面有利・不利
         testEnemies.forEach(eId => {
-            const e = heroesDatabase.find(h => h.id === eId); if(!e) return;
+            const e = heroesMap[eId]; // ★ findではなくマップ検索で高速化
+            if(!e) return;
             
             let nemesisAdv = 2.0, weakAdv = 1.5;
             let nemesisDis = 2.0, weakDis = 1.5;
 
             if (hero.role === 'tank' && e.role === 'tank') {
                 nemesisAdv = 3.0; weakAdv = 2.0;
-                nemesisDis = 3.0; weakDis = 2.0; // 自分が不利（アンチを取られた）の場合は-3.0 / -1.0
+                nemesisDis = 3.0; weakDis = 2.0;
             } else if (hero.role === 'support' || e.role === 'support') {
                 nemesisAdv = 1.0; weakAdv = 0.5;
                 nemesisDis = 2.0; weakDis = 1.0;
             }
 
-            // 有利 (相手が自分を弱点としている)
             let antiScore = 0; let descAnti = "";
             if (e.nemesisTargets.includes(hero.id)) { antiScore = nemesisAdv; descAnti = e.nemesisDesc ? `: ${e.nemesisDesc}` : " (天敵として蹂躙)"; }
             else if (hero.myTags.some(t => e.nemesisTargets.includes(t))) { antiScore = nemesisAdv; descAnti = " (天敵属性)"; }
@@ -363,7 +373,6 @@
             else if (hero.myTags.some(t => e.weakTargets.includes(t))) { antiScore = weakAdv; descAnti = " (有利属性)"; }
             if (antiScore > 0) { score += antiScore; details.push(`<span class="tag-anti">【対面圧倒】vs ${e.name}${descAnti} (+${antiScore.toFixed(1)})</span>`); }
 
-            // 不利 (自分が相手を弱点としている)
             let weakScore = 0; let descWeak = "";
             if (hero.nemesisTargets.includes(e.id)) { weakScore = nemesisDis; descWeak = hero.nemesisDesc ? `: ${hero.nemesisDesc}` : " (天敵)"; }
             else if (e.myTags.some(t => hero.nemesisTargets.includes(t))) { weakScore = nemesisDis; descWeak = " (天敵属性)"; }
@@ -375,9 +384,9 @@
         // 3. 味方シナジー・バッドシナジー
         testAllies.forEach(aId => {
             if(aId === hero.id) return;
-            const a = heroesDatabase.find(h => h.id === aId); if(!a) return;
+            const a = heroesMap[aId]; // ★ findではなくマップ検索
+            if(!a) return;
             
-            // --- グッドシナジー ---
             if (hero.goodSynergyTargets.includes(aId) || a.goodSynergyTargets.includes(hero.id)) {
                 let synScore = 0.5; 
                 let descSyn = hero.goodSynergyDesc ? hero.goodSynergyDesc : (a.goodSynergyDesc ? a.goodSynergyDesc : "強力な固有相性");
@@ -393,7 +402,6 @@
                 }
             }
 
-            // --- バッドシナジー ---
             if (hero.badSynergyTargets.includes(aId) || a.badSynergyTargets.includes(hero.id)) {
                 let badSynScore = 1.5; 
                 let descBadSyn = hero.badSynergyDesc ? hero.badSynergyDesc : (a.badSynergyDesc ? a.badSynergyDesc : "固有のミスマッチ");
@@ -412,9 +420,10 @@
         // 4. サポートのヒール量ルール
         if (hero.role === 'support') {
             let myHeal = hero.myTags.includes('heal_high') ? 3 : (hero.myTags.includes('heal_med') ? 2 : (hero.myTags.includes('heal_low') ? 1 : 0));
-            let otherSupId = testAllies.find(id => id !== hero.id && heroesDatabase.find(h => h.id === id)?.role === 'support');
+            // ★ findではなくマップ検索
+            let otherSupId = testAllies.find(id => id !== hero.id && heroesMap[id]?.role === 'support');
             if (otherSupId && myHeal > 0) {
-                let otherSup = heroesDatabase.find(h => h.id === otherSupId);
+                let otherSup = heroesMap[otherSupId];
                 let otherHeal = otherSup.myTags.includes('heal_high') ? 3 : (otherSup.myTags.includes('heal_med') ? 2 : (otherSup.myTags.includes('heal_low') ? 1 : 0));
                 
                 if (otherHeal > 0) {
@@ -433,32 +442,43 @@
         return { score, details };
     }
 
+    // ★ 重い処理を非同期にするため、UIの更新と実際の計算を分割
     function updateSimulation() {
         if(heroesDatabase.length === 0) return;
-        const currentRule = document.getElementById("match-rule").value.toLowerCase();
-        const currentMapRaw = document.getElementById("match-map").value.toLowerCase();
-        let currentMapBase = currentMapRaw.replace("_atk", "").replace("_def", "");
-        let allySide = currentMapRaw.endsWith("_atk") ? "atk" : (currentMapRaw.endsWith("_def") ? "def" : "");
-        let enemySide = currentMapRaw.endsWith("_atk") ? "def" : (currentMapRaw.endsWith("_def") ? "atk" : "");
-        let enemyMapRaw = currentMapBase ? (currentMapBase + (enemySide ? "_" + enemySide : "")) : "";
 
-        const activeAllies = Object.values(appState.allies).filter(v => v !== "");
-        const activeEnemies = Object.values(appState.enemies).filter(v => v !== "");
+        // 一時的に「計算中」の表示を挟むことでフリーズ感をなくす
+        document.getElementById('optimal-team-box').innerHTML = `
+            <div class="optimal-team-panel">
+                <div style="text-align:center; color:#64748b; font-size: 0.8rem; width:100%;">⚙️ 8万通りの組み合わせから最適解を計算中...</div>
+            </div>`;
 
-        appState.allyResults = {}; appState.enemyResults = {};
-        
-        heroesDatabase.forEach(hero => {
-            let allyEval = evaluateHeroScore(hero, false, activeAllies, activeEnemies, currentMapBase, currentRule, allySide, currentMapRaw);
-            appState.allyResults[hero.id] = { hero: hero, score: allyEval.score, details: allyEval.details };
+        // 50ミリ秒遅延させることで、ブラウザが先にモーダルを閉じる描画を終わらせてくれる
+        setTimeout(() => {
+            const currentRule = document.getElementById("match-rule").value.toLowerCase();
+            const currentMapRaw = document.getElementById("match-map").value.toLowerCase();
+            let currentMapBase = currentMapRaw.replace("_atk", "").replace("_def", "");
+            let allySide = currentMapRaw.endsWith("_atk") ? "atk" : (currentMapRaw.endsWith("_def") ? "def" : "");
+            let enemySide = currentMapRaw.endsWith("_atk") ? "def" : (currentMapRaw.endsWith("_def") ? "atk" : "");
+            let enemyMapRaw = currentMapBase ? (currentMapBase + (enemySide ? "_" + enemySide : "")) : "";
 
-            let enemyEval = evaluateHeroScore(hero, true, activeEnemies, activeAllies, currentMapBase, currentRule, enemySide, enemyMapRaw);
-            appState.enemyResults[hero.id] = { hero: hero, score: enemyEval.score, details: enemyEval.details };
-        });
+            const activeAllies = Object.values(appState.allies).filter(v => v !== "");
+            const activeEnemies = Object.values(appState.enemies).filter(v => v !== "");
 
-        updateScoresUI(); 
-        updateSuggests(); 
-        calculateOptimalTeam();
-        renderDetailsPanel();
+            appState.allyResults = {}; appState.enemyResults = {};
+            
+            heroesDatabase.forEach(hero => {
+                let allyEval = evaluateHeroScore(hero, false, activeAllies, activeEnemies, currentMapBase, currentRule, allySide, currentMapRaw);
+                appState.allyResults[hero.id] = { hero: hero, score: allyEval.score, details: allyEval.details };
+
+                let enemyEval = evaluateHeroScore(hero, true, activeEnemies, activeAllies, currentMapBase, currentRule, enemySide, enemyMapRaw);
+                appState.enemyResults[hero.id] = { hero: hero, score: enemyEval.score, details: enemyEval.details };
+            });
+
+            updateScoresUI(); 
+            updateSuggests(); 
+            calculateOptimalTeam();
+            renderDetailsPanel();
+        }, 50);
     }
 
     function updateSuggests() {
@@ -468,7 +488,7 @@
             suggestBox.innerHTML = '';
             if (!eId) return;
 
-            const eHero = heroesDatabase.find(h => h.id === eId);
+            const eHero = heroesMap[eId]; // ★ 変更
             if (!eHero) return;
 
             let scoredHeroes = heroesDatabase.map(hero => {
@@ -680,15 +700,21 @@
     function selectHero(heroId) {
         if (currentModalSlotId.startsWith('enemy-')) { appState.enemies[currentModalSlotId] = heroId; } else { appState.allies[currentModalSlotId] = heroId; }
         const imgBox = document.getElementById(`img-${currentModalSlotId}`); const nameBox = document.getElementById(`name-${currentModalSlotId}`);
+        
         if (heroId) { 
-            const h = heroesDatabase.find(x => x.id === heroId); 
+            const h = heroesMap[heroId]; // ★ 変更
             imgBox.innerHTML = `<img src="images01/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; 
             nameBox.innerText = h.name; 
         } else { 
             imgBox.innerHTML = currentModalSlotId.includes('tank') ? 'T' : currentModalSlotId.includes('dps') ? 'D' : 'S'; 
             nameBox.innerText = "未選択"; 
         }
-        closeModal(); updateSimulation();
+        
+        // ★ モーダルを先に閉じることで体感速度を改善
+        closeModal(); 
+        
+        // ★ updateSimulation側で非同期処理を行うためそのまま呼び出し
+        updateSimulation();
     }
 
     function closeModal(event) { if (event && event.target !== document.getElementById('hero-modal')) return; document.getElementById("hero-modal").classList.remove("is-active"); }

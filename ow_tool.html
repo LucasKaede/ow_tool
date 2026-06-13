@@ -200,7 +200,7 @@
     };
 
     let heroesDatabase = [];
-    let heroesMap = {}; // ★ 検索速度をO(1)にするためのハッシュマップ
+    let heroesMap = {}; // 高速検索用のマップ
 
     function resetAll() {
         if(!confirm("編成と環境をすべてリセットしますか？")) return;
@@ -298,7 +298,7 @@
                 const parseTargets = (col) => col ? col.split(",").map(t => t.trim().toLowerCase()).filter(t => t !== "") : [];
                 if(id) {
                     let heroName = columns[1];
-                    // 特別対応：特定キャラクターの性別反転表記
+                    // 男体化対応
                     if (id === 'tracer' || id === 'mei') {
                         heroName += ' (♂)';
                     }
@@ -316,7 +316,7 @@
                 }
             }
             
-            // ★ 高速検索用のマップを構築
+            // 高速検索用のマップを構築
             heroesMap = {};
             heroesDatabase.forEach(h => heroesMap[h.id] = h);
 
@@ -352,7 +352,7 @@
 
         // 2. 対面有利・不利
         testEnemies.forEach(eId => {
-            const e = heroesMap[eId]; // ★ findではなくマップ検索で高速化
+            const e = heroesMap[eId];
             if(!e) return;
             
             let nemesisAdv = 2.0, weakAdv = 1.5;
@@ -384,7 +384,7 @@
         // 3. 味方シナジー・バッドシナジー
         testAllies.forEach(aId => {
             if(aId === hero.id) return;
-            const a = heroesMap[aId]; // ★ findではなくマップ検索
+            const a = heroesMap[aId];
             if(!a) return;
             
             if (hero.goodSynergyTargets.includes(aId) || a.goodSynergyTargets.includes(hero.id)) {
@@ -420,7 +420,6 @@
         // 4. サポートのヒール量ルール
         if (hero.role === 'support') {
             let myHeal = hero.myTags.includes('heal_high') ? 3 : (hero.myTags.includes('heal_med') ? 2 : (hero.myTags.includes('heal_low') ? 1 : 0));
-            // ★ findではなくマップ検索
             let otherSupId = testAllies.find(id => id !== hero.id && heroesMap[id]?.role === 'support');
             if (otherSupId && myHeal > 0) {
                 let otherSup = heroesMap[otherSupId];
@@ -442,17 +441,14 @@
         return { score, details };
     }
 
-    // ★ 重い処理を非同期にするため、UIの更新と実際の計算を分割
     function updateSimulation() {
         if(heroesDatabase.length === 0) return;
 
-        // 一時的に「計算中」の表示を挟むことでフリーズ感をなくす
         document.getElementById('optimal-team-box').innerHTML = `
             <div class="optimal-team-panel">
-                <div style="text-align:center; color:#64748b; font-size: 0.8rem; width:100%;">⚙️ 8万通りの組み合わせから最適解を計算中...</div>
+                <div style="text-align:center; color:#64748b; font-size: 0.8rem; width:100%;">⚙️ 最適解を計算中...</div>
             </div>`;
 
-        // 50ミリ秒遅延させることで、ブラウザが先にモーダルを閉じる描画を終わらせてくれる
         setTimeout(() => {
             const currentRule = document.getElementById("match-rule").value.toLowerCase();
             const currentMapRaw = document.getElementById("match-map").value.toLowerCase();
@@ -478,7 +474,7 @@
             updateSuggests(); 
             calculateOptimalTeam();
             renderDetailsPanel();
-        }, 50);
+        }, 10);
     }
 
     function updateSuggests() {
@@ -488,7 +484,7 @@
             suggestBox.innerHTML = '';
             if (!eId) return;
 
-            const eHero = heroesMap[eId]; // ★ 変更
+            const eHero = heroesMap[eId];
             if (!eHero) return;
 
             let scoredHeroes = heroesDatabase.map(hero => {
@@ -553,21 +549,90 @@
 
         if (tanks.length === 0 || dps.length < 2 || sups.length < 2) return;
 
+        // 高速化1: 各キャラの「マップ適正＋対敵適正（ベーススコア）」を事前計算
+        let baseScores = {};
+        heroesDatabase.forEach(hero => {
+            let res = evaluateHeroScore(hero, false, [], activeEnemies, currentMapBase, currentRule, allySide, currentMapRaw);
+            baseScores[hero.id] = res.score;
+        });
+
+        // 高速化2: 味方同士の「シナジースコア行列」を事前計算
+        let synergyMatrix = {};
+        heroesDatabase.forEach(h1 => {
+            synergyMatrix[h1.id] = {};
+            heroesDatabase.forEach(h2 => {
+                if (h1.id === h2.id) { synergyMatrix[h1.id][h2.id] = 0; return; }
+                let synScore = 0;
+                
+                if (h1.goodSynergyTargets.includes(h2.id) || h2.goodSynergyTargets.includes(h1.id)) { synScore += 0.5; } 
+                else if (h2.myTags.some(t => h1.moveTargets.includes(t)) || h1.myTags.some(t => h2.moveTargets.includes(t))) {
+                    if (h1.role === 'tank' || h2.role === 'tank') synScore += (h1.role === 'support') ? 1.0 : 0.5;
+                }
+                
+                if (h1.badSynergyTargets.includes(h2.id) || h2.badSynergyTargets.includes(h1.id)) { synScore -= 1.5; } 
+                else if (h2.myTags.some(t => h1.badSynergyTargets.includes(t)) || h1.myTags.some(t => h2.badSynergyTargets.includes(t))) {
+                    if (h1.role === 'tank' || h2.role === 'tank') synScore -= 0.5;
+                }
+                synergyMatrix[h1.id][h2.id] = synScore;
+            });
+        });
+
+        // 高速化3: サポート同士の「ヒール量スコア行列」を事前計算
+        let healMatrix = {};
+        sups.forEach(s1 => {
+            healMatrix[s1.id] = {};
+            let h1 = s1.myTags.includes('heal_high') ? 3 : (s1.myTags.includes('heal_med') ? 2 : (s1.myTags.includes('heal_low') ? 1 : 0));
+            sups.forEach(s2 => {
+                let pairScore = 0;
+                if (s1.id !== s2.id) {
+                    let h2 = s2.myTags.includes('heal_high') ? 3 : (s2.myTags.includes('heal_med') ? 2 : (s2.myTags.includes('heal_low') ? 1 : 0));
+                    if (h1 > 0 && h2 > 0) {
+                        let total = h1 + h2;
+                        if (total >= 4) pairScore += 1.0;
+                        else if (total === 3) pairScore -= 3.0;
+                        else if (total <= 2) pairScore -= 4.0;
+                    }
+                }
+                healMatrix[s1.id][s2.id] = pairScore;
+            });
+        });
+
         let bestComp = null;
         let maxScore = -9999;
 
-        for (let t of tanks) {
-            for (let i = 0; i < dps.length; i++) {
-                for (let j = i + 1; j < dps.length; j++) { 
+        // 高速化4: 行列を利用した高速総当たり
+        for (let i = 0; i < tanks.length; i++) {
+            let t = tanks[i]; let tBase = baseScores[t.id]; let synT = synergyMatrix[t.id];
+            
+            for (let j = 0; j < dps.length; j++) {
+                let d1 = dps[j]; let d1Base = baseScores[d1.id]; let synD1 = synergyMatrix[d1.id];
+                
+                for (let k = j + 1; k < dps.length; k++) {
+                    let d2 = dps[k]; let d2Base = baseScores[d2.id]; let synD2 = synergyMatrix[d2.id];
+                    
                     for (let x = 0; x < sups.length; x++) {
+                        let s1 = sups[x]; let s1Base = baseScores[s1.id]; let synS1 = synergyMatrix[s1.id]; let healS1 = healMatrix[s1.id];
+                        
                         for (let y = x + 1; y < sups.length; y++) {
-                            let comp = [t, dps[i], dps[j], sups[x], sups[y]];
-                            let score = 0;
-                            comp.forEach(hero => {
-                                let res = evaluateHeroScore(hero, false, comp.map(h => h.id), activeEnemies, currentMapBase, currentRule, allySide, currentMapRaw);
-                                score += res.score;
-                            });
-                            if (score > maxScore) { maxScore = score; bestComp = comp; }
+                            let s2 = sups[y]; let synS2 = synergyMatrix[s2.id];
+                            
+                            // ベーススコア合算
+                            let score = tBase + d1Base + d2Base + s1Base + baseScores[s2.id];
+
+                            // 各シナジースコア合算
+                            score += synT[d1.id] + synT[d2.id] + synT[s1.id] + synT[s2.id];
+                            score += synD1[t.id] + synD1[d2.id] + synD1[s1.id] + synD1[s2.id];
+                            score += synD2[t.id] + synD2[d1.id] + synD2[s1.id] + synD2[s2.id];
+                            score += synS1[t.id] + synS1[d1.id] + synS1[d2.id] + synS1[s2.id];
+                            score += synS2[t.id] + synS2[d1.id] + synS2[d2.id] + synS2[s1.id];
+                            
+                            // ヒールバランス合算
+                            score += healS1[s2.id] + healMatrix[s2.id][s1.id];
+
+                            if (score > maxScore) { 
+                                maxScore = score; 
+                                bestComp = [t, d1, d2, s1, s2]; 
+                            }
                         }
                     }
                 }
@@ -702,7 +767,7 @@
         const imgBox = document.getElementById(`img-${currentModalSlotId}`); const nameBox = document.getElementById(`name-${currentModalSlotId}`);
         
         if (heroId) { 
-            const h = heroesMap[heroId]; // ★ 変更
+            const h = heroesMap[heroId];
             imgBox.innerHTML = `<img src="images01/${h.id}.png" onerror="this.style.display='none'; this.parentNode.innerText='${h.name.substring(0,1)}'">`; 
             nameBox.innerText = h.name; 
         } else { 
@@ -710,10 +775,7 @@
             nameBox.innerText = "未選択"; 
         }
         
-        // ★ モーダルを先に閉じることで体感速度を改善
         closeModal(); 
-        
-        // ★ updateSimulation側で非同期処理を行うためそのまま呼び出し
         updateSimulation();
     }
 

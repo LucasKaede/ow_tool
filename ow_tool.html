@@ -48,9 +48,11 @@
         .winrate-role-col { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
         .winrate-role-title { font-size: 0.65rem; font-weight: bold; padding-bottom: 2px; margin-bottom: 2px; border-bottom: 1px solid; text-align: center; }
         .winrate-item { display: flex; align-items: center; gap: 3px; background-color: var(--bg-color); padding: 3px 4px; border-radius: 4px; border: 1px solid var(--panel-sub); font-size: 0.65rem; }
-        .winrate-item img { width: 14px; height: 14px; border-radius: 3px; object-fit: cover; flex-shrink: 0; }
-        .winrate-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-        .winrate-value { font-weight: bold; color: #34d399; margin-left: auto; font-size: 0.65rem; }
+        .winrate-item img { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; flex-shrink: 0; }
+        .winrate-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-weight: bold; color: var(--text-main); }
+        .winrate-value-wrap { display: flex; flex-direction: column; align-items: flex-end; margin-left: auto; line-height: 1.1; }
+        .winrate-value { font-weight: bold; color: #34d399; font-size: 0.65rem; }
+        .winrate-value-base { font-size: 0.5rem; color: var(--text-sub); font-weight: normal; }
 
         .team-row { display: flex; justify-content: space-between; gap: 6px; margin-top: 24px; }
         
@@ -154,9 +156,8 @@
         </div>
     </div>
 
-    <!-- ▼ 勝率Top3（ロール別）を表示するパネル ▼ -->
     <div id="map-winrate-panel" class="winrate-panel">
-        <div style="color: var(--text-sub); font-size: 0.75rem;">📊 <span id="winrate-map-name"></span> の高勝率ヒーロー</div>
+        <div style="color: var(--text-sub); font-size: 0.75rem;">📊 <span id="winrate-map-name"></span> の強力なヒーロー (相対変動率)</div>
         <div id="winrate-list" class="winrate-list">データ取得中...</div>
     </div>
 
@@ -236,24 +237,30 @@
 
     const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHb34RcBctjEcBeNrixnFu_sfbF7B2sAjFkWVIHcqKcLhmurraDyS2thmJbGTlrF3WNUom2go4P66X/pub?output=csv";
     
+    // 3つの勝率シートのURL
     const WINRATE_CSV_URLS = [
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1386442422", // Tank
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=2145672425", // DPS
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1735556932"  // Support
     ];
 
+    // ▼ 表記揺れを吸収する超・堅牢な翻訳辞書
     const ALIAS_MAP = {
         "antarctica": "antarctic_peninsula",
+        "lijiang": "lijiang_tower",
         "blizz world": "blizzard_world",
         "queen st.": "new_queen_street",
         "new junk": "new_junk_city",
-        "king's row": "kings_row",
-        "paraiso": "paraiso"
+        "aatlis": "throne_of_anubis", 
+        "anubis": "throne_of_anubis",
+        "gibraltar": "gibraltar"
     };
 
     function normalizeName(name) {
         let n = name.toLowerCase().trim();
-        return ALIAS_MAP[n] || n;
+        n = ALIAS_MAP[n] || n;
+        // 空白や記号をアンダーバーに統一して完全に一致させる
+        return n.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_'); 
     }
 
     const appState = {
@@ -271,7 +278,7 @@
     let isSyncing = false; 
 
     // ==========================================
-    // マップ別 勝率データの読み込みと表示 (各シート個別ヘッダー解析＆相対値ランキング版)
+    // マップ別 勝率データの読み込み（強引突破のファジー解析版）
     // ==========================================
     async function loadWinrateData() {
         winrateData = {}; 
@@ -281,43 +288,72 @@
                 const response = await fetch(url);
                 if (!response.ok) continue;
                 const csvText = await response.text();
-                
                 if (csvText.trim().startsWith("<!DOCTYPE html>")) continue;
 
-                // 改行コードの揺れを統一して分割
+                // 改行コードの揺れを統一
                 const lines = csvText.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(l => l !== "");
                 if (lines.length < 2) continue;
 
-                // 各シートごとのヘッダーをパース
+                // 1行目のヘッダーから、マップが存在する列番号（インデックス）を特定する
                 const headers = parseCSVLine(lines[0]);
-                
+                const mapCols = {};
+                for(let j=0; j<headers.length; j++) {
+                    if(!headers[j]) continue;
+                    let hLow = headers[j].toLowerCase();
+                    // ヘッダー名がHeroやWinrateっぽい列は無視
+                    if(hLow.includes("hero") || hLow.includes("win")) continue;
+                    let mapKey = normalizeName(headers[j]);
+                    if(mapKey) mapCols[j] = mapKey;
+                }
+
+                // データ行のパース
                 for (let i = 1; i < lines.length; i++) {
                     const cols = parseCSVLine(lines[i]);
                     if (cols.length < 3) continue;
 
-                    let heroRaw = cols[1]; // B列: キャラ名
+                    let heroRaw = "";
+                    let baseRate = 50.0;
+                    let heroNameCol = -1;
+
+                    // 最初の3列くらいの中から「キャラ名」と「基本勝率」を探し出す（強引ファジー処理）
+                    for(let c=0; c<=2; c++) {
+                        if(!cols[c]) continue;
+                        if(cols[c].includes('%')) {
+                            let val = parseFloat(cols[c].replace(/[^0-9.-]/g, ''));
+                            // 30〜70%の数字なら「基本勝率」とみなす（増減値の数パーセントと区別する）
+                            if(!isNaN(val) && val > 30 && val < 70) baseRate = val;
+                        } else if(cols[c].match(/[a-zA-Z]/)) { 
+                            // アルファベットが含まれていれば「キャラ名」とみなす
+                            heroRaw = cols[c];
+                            heroNameCol = c;
+                        }
+                    }
+
                     if (!heroRaw) continue;
 
+                    // キャラ名からデータベースと照合
                     let heroObj = heroesDatabase.find(h => h.name.toLowerCase() === heroRaw.toLowerCase() || h.id === heroRaw.toLowerCase());
-                    let heroId = heroObj ? heroObj.id : null;
-                    let displayName = heroObj ? heroObj.name : heroRaw;
-                    let heroRole = heroObj ? heroObj.role : 'unknown';
+                    if(!heroObj) {
+                        heroObj = heroesDatabase.find(h => h.name.toLowerCase().includes(heroRaw.toLowerCase()));
+                    }
+                    if(!heroObj) continue;
 
-                    // C列（インデックス2）以降が各マップの「相対的な増減値」
-                    for (let j = 2; j < cols.length; j++) {
-                        let mapNameRaw = headers[j];
-                        if (!mapNameRaw) continue;
-                        
-                        let mapKey = normalizeName(mapNameRaw);
+                    let heroId = heroObj.id;
+                    let displayName = heroObj.name;
+                    let heroRole = heroObj.role;
+
+                    // マップごとの列データを処理
+                    for (let j in mapCols) {
+                        if (j == heroNameCol || !cols[j]) continue;
+                        let mapKey = mapCols[j];
                         if (!winrateData[mapKey]) winrateData[mapKey] = [];
 
-                        // 「+1.6%」や「-0.4%」などの文字列をパース
-                        let diffStr = cols[j].replace('%', '').trim();
+                        let diffStr = cols[j].replace(/[^0-9.-]/g, '');
                         let diffVal = parseFloat(diffStr);
                         
                         if (!isNaN(diffVal)) {
-                            // 純粋に「そのマップでの相対的な優位性（差分数値）」を格納
-                            winrateData[mapKey].push({ heroId: heroId, name: displayName, rate: diffVal, role: heroRole });
+                            // 相対増減値(diff)と、基本勝率(base)の両方を保存
+                            winrateData[mapKey].push({ heroId: heroId, name: displayName, diff: diffVal, base: baseRate, role: heroRole });
                         }
                     }
                 }
@@ -326,9 +362,9 @@
             }
         }
 
-        // 全マップ、全データが揃った後に「差分数値が大きい順」にソート
+        // 最後に「差分が大きい順（相対的に強い順）」にソート
         for (let k in winrateData) {
-            winrateData[k].sort((a, b) => b.rate - a.rate);
+            winrateData[k].sort((a, b) => b.diff - a.diff);
         }
     }
 
@@ -345,16 +381,18 @@
         let mapDisplayName = mapSelect.options[mapSelect.selectedIndex].text.replace(/ ⚔\(攻\)| 🛡\(防\)/g, '');
 
         let searchKey = normalizeName(currentMapBase);
+        
+        // 正規化されたキーから、完全一致または部分一致でデータを探す
         let matchedKey = Object.keys(winrateData).find(k => k === searchKey || k.includes(searchKey) || searchKey.includes(k));
 
         if (!matchedKey || winrateData[matchedKey].length === 0) {
             panel.style.display = 'block';
             mapNameSpan.innerText = mapDisplayName;
-            listContainer.innerHTML = `<span style="color:var(--text-sub);">このマップの相対勝率データが取得できませんでした。（シートの共有設定等をご確認ください）</span>`;
+            listContainer.innerHTML = `<span style="color:var(--text-sub);">このマップの相対勝率データが取得できませんでした。</span>`;
             return;
         }
 
-        // 該当マップのデータから、ロールごとに数値が大きいトップ3を抽出
+        // ロールごとにTop3を抽出
         const tanks = winrateData[matchedKey].filter(i => i.role === 'tank').slice(0, 3);
         const dps = winrateData[matchedKey].filter(i => i.role === 'dps').slice(0, 3);
         const sups = winrateData[matchedKey].filter(i => i.role === 'support').slice(0, 3);
@@ -372,9 +410,19 @@
             html += `<div class="winrate-role-title" style="color:${r.color}; border-bottom-color:${r.color};">${r.label}</div>`;
             r.items.forEach(item => {
                 let imgHtml = item.heroId ? `<img src="images01/${item.heroId}.png" onerror="this.style.display='none'">` : '';
-                // プラス値の場合は見やすく「+」を表示
-                let prefix = item.rate > 0 ? '+' : '';
-                html += `<div class="winrate-item">${imgHtml}<span class="winrate-name">${item.name}</span><span class="winrate-value">${prefix}${item.rate.toFixed(1)}%</span></div>`;
+                let prefix = item.diff > 0 ? '+' : '';
+                let finalRate = (item.base + item.diff).toFixed(1);
+                
+                // 変動値と基本勝率を横・縦に整列させるリッチな表示
+                html += `
+                <div class="winrate-item">
+                    ${imgHtml}
+                    <span class="winrate-name">${item.name}</span>
+                    <div class="winrate-value-wrap">
+                        <span class="winrate-value">${prefix}${item.diff.toFixed(1)}%</span>
+                        <span class="winrate-value-base">(${finalRate}%)</span>
+                    </div>
+                </div>`;
             });
             html += `</div>`;
         });
@@ -614,11 +662,10 @@
             heroesMap = {};
             heroesDatabase.forEach(h => heroesMap[h.id] = h);
 
-            document.getElementById("load-status").innerText = `✓ データ読込完了（${heroesDatabase.length}体）`;
             updateMapOptions(); 
-            startFirebaseSync();
-            updateSimulation();
-        } catch (error) { document.getElementById("load-status").innerText = "エラー: データの読み込みに失敗しました。"; }
+        } catch (error) { 
+            document.getElementById("load-status").innerText = "エラー: データの読み込みに失敗しました。"; 
+        }
     }
 
     function evaluateHeroScore(hero, isEnemySlot, testAllies, testEnemies, currentMapBase, currentRule, mapSide, mapRaw) {
@@ -902,7 +949,7 @@
                             let score = tBase + d1Base + d2Base + s1Base + baseScores[s2.id];
                             score += synT[d1.id] + synT[d2.id] + synT[s1.id] + synT[s2.id];
                             score += synD1[t.id] + synD1[d2.id] + synD1[s1.id] + synD1[s2.id];
-                            score += synD2[t.id] + synD1[d1.id] + synD2[s1.id] + synD2[s2.id];
+                            score += synD2[t.id] + synD2[d1.id] + synD2[s1.id] + synD2[s2.id];
                             score += synS1[t.id] + synS1[d1.id] + synS1[d2.id] + synS1[s2.id];
                             score += synS2[t.id] + synS2[d1.id] + synS2[d2.id] + synS2[s1.id];
                             score += healS1[s2.id] + healMatrix[s2.id][s1.id];
@@ -1068,9 +1115,18 @@
     window.selectHero = selectHero;
     window.closeModal = closeModal;
 
-    window.onload = () => {
-        loadSpreadsheetData();
-        loadWinrateData(); 
+    // ▼ 非同期の順番を厳密に制御して「リロードで消えるバグ」を完全解消 ▼
+    window.onload = async () => {
+        const statusEl = document.getElementById("load-status");
+        
+        statusEl.innerText = "キャラデータを読み込み中...";
+        await loadSpreadsheetData();
+        
+        statusEl.innerText = "勝率データを読み込み中...";
+        await loadWinrateData(); 
+        
+        statusEl.innerText = "✓ オンライン同期開始";
+        startFirebaseSync();
         
         document.getElementById("match-rule").addEventListener("change", pushDataToFirebase);
         document.getElementById("match-map").addEventListener("change", pushDataToFirebase);

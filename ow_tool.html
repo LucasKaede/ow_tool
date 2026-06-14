@@ -236,14 +236,12 @@
 
     const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHb34RcBctjEcBeNrixnFu_sfbF7B2sAjFkWVIHcqKcLhmurraDyS2thmJbGTlrF3WNUom2go4P66X/pub?output=csv";
     
-    // ★ いただいたURLをそのまま設定（ロールごとのgid）
     const WINRATE_CSV_URLS = [
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1386442422", // Tank
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=2145672425", // DPS
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1735556932"  // Support
     ];
 
-    // ▼ 表記揺れを吸収する翻訳辞書
     const ALIAS_MAP = {
         "antarctica": "antarctic_peninsula",
         "blizz world": "blizzard_world",
@@ -273,7 +271,7 @@
     let isSyncing = false; 
 
     // ==========================================
-    // マップ別 勝率データの読み込みと表示 (ロール別Top3対応版)
+    // マップ別 勝率データの読み込みと表示 (各シート個別ヘッダー解析＆相対値ランキング版)
     // ==========================================
     async function loadWinrateData() {
         winrateData = {}; 
@@ -286,26 +284,26 @@
                 
                 if (csvText.trim().startsWith("<!DOCTYPE html>")) continue;
 
-                const lines = csvText.split("\n").map(l => l.trim()).filter(l => l !== "");
+                // 改行コードの揺れを統一して分割
+                const lines = csvText.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(l => l !== "");
                 if (lines.length < 2) continue;
 
+                // 各シートごとのヘッダーをパース
                 const headers = parseCSVLine(lines[0]);
                 
                 for (let i = 1; i < lines.length; i++) {
                     const cols = parseCSVLine(lines[i]);
                     if (cols.length < 3) continue;
 
-                    let baseRateStr = cols[0].replace('%', '').trim();
-                    let heroRaw = cols[1];
-                    
-                    if (!heroRaw || isNaN(parseFloat(baseRateStr))) continue;
-                    let baseRate = parseFloat(baseRateStr);
+                    let heroRaw = cols[1]; // B列: キャラ名
+                    if (!heroRaw) continue;
 
                     let heroObj = heroesDatabase.find(h => h.name.toLowerCase() === heroRaw.toLowerCase() || h.id === heroRaw.toLowerCase());
                     let heroId = heroObj ? heroObj.id : null;
                     let displayName = heroObj ? heroObj.name : heroRaw;
-                    let heroRole = heroObj ? heroObj.role : 'unknown'; // ロール情報を取得
+                    let heroRole = heroObj ? heroObj.role : 'unknown';
 
+                    // C列（インデックス2）以降が各マップの「相対的な増減値」
                     for (let j = 2; j < cols.length; j++) {
                         let mapNameRaw = headers[j];
                         if (!mapNameRaw) continue;
@@ -313,12 +311,13 @@
                         let mapKey = normalizeName(mapNameRaw);
                         if (!winrateData[mapKey]) winrateData[mapKey] = [];
 
+                        // 「+1.6%」や「-0.4%」などの文字列をパース
                         let diffStr = cols[j].replace('%', '').trim();
                         let diffVal = parseFloat(diffStr);
                         
                         if (!isNaN(diffVal)) {
-                            let finalRate = (baseRate + diffVal).toFixed(1);
-                            winrateData[mapKey].push({ heroId: heroId, name: displayName, rate: parseFloat(finalRate), role: heroRole });
+                            // 純粋に「そのマップでの相対的な優位性（差分数値）」を格納
+                            winrateData[mapKey].push({ heroId: heroId, name: displayName, rate: diffVal, role: heroRole });
                         }
                     }
                 }
@@ -327,6 +326,7 @@
             }
         }
 
+        // 全マップ、全データが揃った後に「差分数値が大きい順」にソート
         for (let k in winrateData) {
             winrateData[k].sort((a, b) => b.rate - a.rate);
         }
@@ -350,11 +350,11 @@
         if (!matchedKey || winrateData[matchedKey].length === 0) {
             panel.style.display = 'block';
             mapNameSpan.innerText = mapDisplayName;
-            listContainer.innerHTML = `<span style="color:var(--text-sub);">このマップの勝率データが取得できませんでした。（シートの共有設定等をご確認ください）</span>`;
+            listContainer.innerHTML = `<span style="color:var(--text-sub);">このマップの相対勝率データが取得できませんでした。（シートの共有設定等をご確認ください）</span>`;
             return;
         }
 
-        // ロールごとにTop3を抽出
+        // 該当マップのデータから、ロールごとに数値が大きいトップ3を抽出
         const tanks = winrateData[matchedKey].filter(i => i.role === 'tank').slice(0, 3);
         const dps = winrateData[matchedKey].filter(i => i.role === 'dps').slice(0, 3);
         const sups = winrateData[matchedKey].filter(i => i.role === 'support').slice(0, 3);
@@ -372,7 +372,9 @@
             html += `<div class="winrate-role-title" style="color:${r.color}; border-bottom-color:${r.color};">${r.label}</div>`;
             r.items.forEach(item => {
                 let imgHtml = item.heroId ? `<img src="images01/${item.heroId}.png" onerror="this.style.display='none'">` : '';
-                html += `<div class="winrate-item">${imgHtml}<span class="winrate-name">${item.name}</span><span class="winrate-value">${item.rate.toFixed(1)}%</span></div>`;
+                // プラス値の場合は見やすく「+」を表示
+                let prefix = item.rate > 0 ? '+' : '';
+                html += `<div class="winrate-item">${imgHtml}<span class="winrate-name">${item.name}</span><span class="winrate-value">${prefix}${item.rate.toFixed(1)}%</span></div>`;
             });
             html += `</div>`;
         });
@@ -900,7 +902,7 @@
                             let score = tBase + d1Base + d2Base + s1Base + baseScores[s2.id];
                             score += synT[d1.id] + synT[d2.id] + synT[s1.id] + synT[s2.id];
                             score += synD1[t.id] + synD1[d2.id] + synD1[s1.id] + synD1[s2.id];
-                            score += synD2[t.id] + synD2[d1.id] + synD2[s1.id] + synD2[s2.id];
+                            score += synD2[t.id] + synD1[d1.id] + synD2[s1.id] + synD2[s2.id];
                             score += synS1[t.id] + synS1[d1.id] + synS1[d2.id] + synS1[s2.id];
                             score += synS2[t.id] + synS2[d1.id] + synS2[d2.id] + synS2[s1.id];
                             score += healS1[s2.id] + healMatrix[s2.id][s1.id];

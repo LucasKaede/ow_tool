@@ -22,7 +22,6 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; padding-bottom: 40px; }
         
-        /* ヘッダーの高さを削減しスッキリと */
         header { padding: 8px 10px; background-color: var(--panel-bg); box-shadow: 0 2px 8px rgba(0,0,0,0.5); position: sticky; top: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-top { display: flex; justify-content: center; align-items: center; width: 100%; position: relative; }
         h1 { font-size: 1.1rem; margin: 0; }
@@ -43,14 +42,16 @@
         .env-select-wrap { flex: 1; background-color: var(--panel-bg); border-radius: 8px; border: 1px solid var(--panel-sub); overflow: hidden; }
         .env-select-wrap select { width: 100%; background: transparent; color: #fff; border: none; padding: 12px; font-size: 0.9rem; outline: none; appearance: none; cursor: pointer; }
 
-        /* ▼ 新機能：勝率Top10パネルのCSS ▼ */
-        .winrate-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 10px 12px; margin-top: -10px; border: 1px solid var(--panel-sub); display: none; }
-        .winrate-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-        .winrate-item { display: flex; align-items: center; gap: 4px; background-color: var(--bg-color); padding: 4px 6px; border-radius: 4px; border: 1px solid var(--panel-sub); font-size: 0.7rem; }
-        .winrate-item img { width: 18px; height: 18px; border-radius: 3px; object-fit: cover; }
-        .winrate-value { font-weight: bold; color: #34d399; margin-left: 2px; }
+        /* ▼ ロール別勝率Top3パネルのCSS ▼ */
+        .winrate-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 10px; margin-top: -10px; border: 1px solid var(--panel-sub); display: none; }
+        .winrate-list { display: flex; gap: 6px; margin-top: 8px; justify-content: space-between; }
+        .winrate-role-col { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+        .winrate-role-title { font-size: 0.65rem; font-weight: bold; padding-bottom: 2px; margin-bottom: 2px; border-bottom: 1px solid; text-align: center; }
+        .winrate-item { display: flex; align-items: center; gap: 3px; background-color: var(--bg-color); padding: 3px 4px; border-radius: 4px; border: 1px solid var(--panel-sub); font-size: 0.65rem; }
+        .winrate-item img { width: 14px; height: 14px; border-radius: 3px; object-fit: cover; flex-shrink: 0; }
+        .winrate-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        .winrate-value { font-weight: bold; color: #34d399; margin-left: auto; font-size: 0.65rem; }
 
-        /* キャラクター枠の上にバッジ用の空間（margin-top: 24px）を確保 */
         .team-row { display: flex; justify-content: space-between; gap: 6px; margin-top: 24px; }
         
         .slot-wrapper { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; background-color: var(--panel-bg); border-radius: 8px; padding: 6px 4px; border: 2px solid transparent; transition: 0.2s; position: relative; }
@@ -107,7 +108,6 @@
         .modal-item .score-badge { position: absolute; top: -8px; right: -6px; font-size: 0.7rem; }
         .clear-btn { grid-column: 1 / -1; flex-direction: row; justify-content: center; background-color: #3f2c33; color: #f43f5e; font-weight: bold; padding: 14px; margin-bottom: 5px; }
 
-        /* ▼ バッジの位置を上部（top: -22px）にし、スコアと完全に被らないように調整 ▼ */
         .target-badge { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; font-weight: bold; z-index: 10; display: none; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.5); background-color: #991b1b; color: #fca5a5; border: 1px solid #f87171; }
         
         .ult-btn { background-color: #64748b; color: #fff; border: none; border-radius: 4px; padding: 4px 0; font-size: 0.6rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 4px; transition: 0.1s; }
@@ -154,9 +154,9 @@
         </div>
     </div>
 
-    <!-- ▼ 勝率Top10を表示するパネル ▼ -->
+    <!-- ▼ 勝率Top3（ロール別）を表示するパネル ▼ -->
     <div id="map-winrate-panel" class="winrate-panel">
-        <div style="color: var(--text-sub); font-size: 0.75rem;">📊 <span id="winrate-map-name"></span> の高勝率ヒーロー (Top 10)</div>
+        <div style="color: var(--text-sub); font-size: 0.75rem;">📊 <span id="winrate-map-name"></span> の高勝率ヒーロー</div>
         <div id="winrate-list" class="winrate-list">データ取得中...</div>
     </div>
 
@@ -236,8 +236,27 @@
 
     const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHb34RcBctjEcBeNrixnFu_sfbF7B2sAjFkWVIHcqKcLhmurraDyS2thmJbGTlrF3WNUom2go4P66X/pub?output=csv";
     
-    // ▼ 新規：勝率スプレッドシートのURL（/export?format=csv に変換済み）
-    const WINRATE_CSV_URL = "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1683699085";
+    // ★ いただいたURLをそのまま設定（ロールごとのgid）
+    const WINRATE_CSV_URLS = [
+        "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1386442422", // Tank
+        "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=2145672425", // DPS
+        "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1735556932"  // Support
+    ];
+
+    // ▼ 表記揺れを吸収する翻訳辞書
+    const ALIAS_MAP = {
+        "antarctica": "antarctic_peninsula",
+        "blizz world": "blizzard_world",
+        "queen st.": "new_queen_street",
+        "new junk": "new_junk_city",
+        "king's row": "kings_row",
+        "paraiso": "paraiso"
+    };
+
+    function normalizeName(name) {
+        let n = name.toLowerCase().trim();
+        return ALIAS_MAP[n] || n;
+    }
 
     const appState = {
         enemies: { 'enemy-tank': '', 'enemy-dps1': '', 'enemy-dps2': '', 'enemy-sup1': '', 'enemy-sup2': '' },
@@ -250,57 +269,66 @@
 
     let heroesDatabase = [];
     let heroesMap = {};
-    let winrateData = {}; // ★追加：パースした勝率データを格納
+    let winrateData = {}; 
     let isSyncing = false; 
 
     // ==========================================
-    // 新機能: マップ別 勝率データの読み込みと表示
+    // マップ別 勝率データの読み込みと表示 (ロール別Top3対応版)
     // ==========================================
     async function loadWinrateData() {
-        try {
-            const response = await fetch(WINRATE_CSV_URL);
-            if (!response.ok) throw new Error("Network error");
-            const csvText = await response.text();
-            
-            // 権限エラー等でHTML（ログイン画面）が返ってきた場合の弾き
-            if (csvText.trim().startsWith("<!DOCTYPE html>")) throw new Error("Permission error");
+        winrateData = {}; 
+        
+        for (const url of WINRATE_CSV_URLS) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) continue;
+                const csvText = await response.text();
+                
+                if (csvText.trim().startsWith("<!DOCTYPE html>")) continue;
 
-            const lines = csvText.split("\n").map(l => l.trim()).filter(l => l !== "");
-            if (lines.length < 2) return;
+                const lines = csvText.split("\n").map(l => l.trim()).filter(l => l !== "");
+                if (lines.length < 2) continue;
 
-            // 1行目をマップ名（ヘッダー）としてパース
-            const headers = parseCSVLine(lines[0]);
-            headers.forEach((h, i) => { if(i > 0) winrateData[h.toLowerCase()] = []; });
+                const headers = parseCSVLine(lines[0]);
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = parseCSVLine(lines[i]);
+                    if (cols.length < 3) continue;
 
-            // 2行目以降をキャラごとの勝率としてパース
-            for (let i = 1; i < lines.length; i++) {
-                const cols = parseCSVLine(lines[i]);
-                const heroRaw = cols[0]; // A列: キャラ名
-                if (!heroRaw) continue;
-
-                // ツール内のキャラデータと名前を突合（完全一致しなくても表示できるようにする）
-                let heroObj = heroesDatabase.find(h => h.name === heroRaw || h.id === heroRaw.toLowerCase());
-                let heroId = heroObj ? heroObj.id : null;
-                let displayName = heroObj ? heroObj.name : heroRaw;
-
-                for (let j = 1; j < cols.length; j++) {
-                    let headerKey = headers[j].toLowerCase();
-                    // 「52.3%」などの文字列から数字だけを抽出
-                    let rateVal = parseFloat(cols[j].replace(/[^0-9.]/g, ''));
+                    let baseRateStr = cols[0].replace('%', '').trim();
+                    let heroRaw = cols[1];
                     
-                    if (!isNaN(rateVal) && winrateData[headerKey]) {
-                        winrateData[headerKey].push({ heroId: heroId, name: displayName, rate: rateVal });
+                    if (!heroRaw || isNaN(parseFloat(baseRateStr))) continue;
+                    let baseRate = parseFloat(baseRateStr);
+
+                    let heroObj = heroesDatabase.find(h => h.name.toLowerCase() === heroRaw.toLowerCase() || h.id === heroRaw.toLowerCase());
+                    let heroId = heroObj ? heroObj.id : null;
+                    let displayName = heroObj ? heroObj.name : heroRaw;
+                    let heroRole = heroObj ? heroObj.role : 'unknown'; // ロール情報を取得
+
+                    for (let j = 2; j < cols.length; j++) {
+                        let mapNameRaw = headers[j];
+                        if (!mapNameRaw) continue;
+                        
+                        let mapKey = normalizeName(mapNameRaw);
+                        if (!winrateData[mapKey]) winrateData[mapKey] = [];
+
+                        let diffStr = cols[j].replace('%', '').trim();
+                        let diffVal = parseFloat(diffStr);
+                        
+                        if (!isNaN(diffVal)) {
+                            let finalRate = (baseRate + diffVal).toFixed(1);
+                            winrateData[mapKey].push({ heroId: heroId, name: displayName, rate: parseFloat(finalRate), role: heroRole });
+                        }
                     }
                 }
+            } catch (error) {
+                console.error("勝率データの取得失敗:", error);
             }
+        }
 
-            // 各マップごとに勝率が高い順に並び替え
-            for (let k in winrateData) {
-                winrateData[k].sort((a, b) => b.rate - a.rate);
-            }
-        } catch (error) {
-            console.error("勝率データの取得失敗:", error);
-            document.getElementById('winrate-list').innerHTML = `<span style="color:#f43f5e;">勝率データが取得できませんでした。<br>シートの共有設定が「リンクを知っている全員が閲覧可」になっているか確認してください。</span>`;
+        for (let k in winrateData) {
+            winrateData[k].sort((a, b) => b.rate - a.rate);
         }
     }
 
@@ -316,32 +344,43 @@
         let currentMapBase = currentMapRaw.replace("_atk", "").replace("_def", "");
         let mapDisplayName = mapSelect.options[mapSelect.selectedIndex].text.replace(/ ⚔\(攻\)| 🛡\(防\)/g, '');
 
-        // スプレッドシートのマップ名（ヘッダー）と、ツールのマップ名を曖昧検索でマッチングさせる
-        let matchedKey = Object.keys(winrateData).find(k => 
-            k === currentMapBase || k.includes(currentMapBase) || 
-            k === mapDisplayName.toLowerCase() || mapDisplayName.toLowerCase().includes(k)
-        );
+        let searchKey = normalizeName(currentMapBase);
+        let matchedKey = Object.keys(winrateData).find(k => k === searchKey || k.includes(searchKey) || searchKey.includes(k));
 
         if (!matchedKey || winrateData[matchedKey].length === 0) {
             panel.style.display = 'block';
             mapNameSpan.innerText = mapDisplayName;
-            listContainer.innerHTML = `<span style="color:var(--text-sub);">このマップの勝率データがシートに見つかりません。</span>`;
+            listContainer.innerHTML = `<span style="color:var(--text-sub);">このマップの勝率データが取得できませんでした。（シートの共有設定等をご確認ください）</span>`;
             return;
         }
 
-        // 上位10キャラを抽出
-        const top10 = winrateData[matchedKey].slice(0, 10);
+        // ロールごとにTop3を抽出
+        const tanks = winrateData[matchedKey].filter(i => i.role === 'tank').slice(0, 3);
+        const dps = winrateData[matchedKey].filter(i => i.role === 'dps').slice(0, 3);
+        const sups = winrateData[matchedKey].filter(i => i.role === 'support').slice(0, 3);
+
+        const rolesData = [
+            { id: 'tank', label: 'Tank', items: tanks, color: 'var(--accent-tank)' },
+            { id: 'dps', label: 'DPS', items: dps, color: 'var(--accent-dps)' },
+            { id: 'support', label: 'Support', items: sups, color: 'var(--accent-support)' }
+        ];
+
         let html = '';
-        top10.forEach(item => {
-            let imgHtml = item.heroId ? `<img src="images01/${item.heroId}.png" onerror="this.style.display='none'">` : '';
-            html += `<div class="winrate-item">${imgHtml}<span>${item.name}</span><span class="winrate-value">${item.rate}%</span></div>`;
+        rolesData.forEach(r => {
+            if(r.items.length === 0) return;
+            html += `<div class="winrate-role-col">`;
+            html += `<div class="winrate-role-title" style="color:${r.color}; border-bottom-color:${r.color};">${r.label}</div>`;
+            r.items.forEach(item => {
+                let imgHtml = item.heroId ? `<img src="images01/${item.heroId}.png" onerror="this.style.display='none'">` : '';
+                html += `<div class="winrate-item">${imgHtml}<span class="winrate-name">${item.name}</span><span class="winrate-value">${item.rate.toFixed(1)}%</span></div>`;
+            });
+            html += `</div>`;
         });
 
         mapNameSpan.innerText = mapDisplayName;
         listContainer.innerHTML = html;
         panel.style.display = 'block';
     }
-
 
     // ==========================================
     // ULT注意と要警戒ターゲット算出
@@ -726,7 +765,7 @@
             calculateOptimalTeam();
             renderDetailsPanel();
             updateDangerTarget(); 
-            displayMapWinrates(); // ★追加：シミュレーション更新時に勝率パネルも更新
+            displayMapWinrates(); 
         }, 10);
     }
 
@@ -1029,7 +1068,7 @@
 
     window.onload = () => {
         loadSpreadsheetData();
-        loadWinrateData(); // ★追加：勝率データもロード開始
+        loadWinrateData(); 
         
         document.getElementById("match-rule").addEventListener("change", pushDataToFirebase);
         document.getElementById("match-map").addEventListener("change", pushDataToFirebase);

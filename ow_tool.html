@@ -25,6 +25,12 @@
         header { padding: 8px 10px; background-color: var(--panel-bg); box-shadow: 0 2px 8px rgba(0,0,0,0.5); position: sticky; top: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-top { display: flex; justify-content: center; align-items: center; width: 100%; position: relative; }
         h1 { font-size: 1.1rem; margin: 0; }
+        
+        /* ▼ 追加：ルーム切り替えボタンのCSS ▼ */
+        .room-btn { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); background-color: var(--panel-sub); color: #fff; border: none; padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .room-btn:active { transform: translateY(-50%) scale(0.9); }
+        .room-btn.room-b { background-color: #6366f1; } /* ルームBの時は色が変わる */
+        
         .reset-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background-color: var(--panel-sub); color: #fff; border: none; padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .reset-btn:active { transform: translateY(-50%) scale(0.9); }
         #load-status { font-size: 0.7rem; color: var(--text-sub); margin-top: 3px; }
@@ -114,7 +120,6 @@
         .ult-btn { background-color: #64748b; color: #fff; border: none; border-radius: 4px; padding: 4px 0; font-size: 0.6rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 4px; transition: 0.1s; }
         .ult-btn:active { transform: scale(0.9); }
 
-        /* ▼▼▼ 新機能：ULT注意通知ウィンドウのCSS ▼▼▼ */
         #ult-alerts-container { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .ult-alert-box { background-color: rgba(127, 29, 29, 0.95); border: 2px solid #ef4444; border-bottom: none; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.8); display: flex; align-items: center; padding: 8px 12px; gap: 12px; position: relative; overflow: hidden; pointer-events: auto; color: #fff; animation: slideDown 0.3s ease-out; }
         .ult-alert-img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 2px solid #fca5a5; background-color: #000; flex-shrink: 0; }
@@ -125,13 +130,14 @@
         
         @keyframes shrinkGauge { from { transform: scaleX(1); } to { transform: scaleX(0); } }
         @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        /* ▲▲▲ 新機能ここまで ▲▲▲ */
     </style>
 </head>
 <body>
 
 <header>
     <div class="header-top">
+        <!-- ▼ 左上にルーム切り替えボタンを追加 ▼ -->
+        <button id="room-toggle-btn" class="room-btn" onclick="toggleRoom()">🚪 ルームA</button>
         <h1>OW メタツール~ONLINE~</h1>
         <button class="reset-btn" onclick="resetAll()">↻ リセット</button>
     </div>
@@ -240,7 +246,11 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const dbRef = ref(db, 'ow_match/current_state');
+    
+    // ▼ ルーム管理用の変数（初期はルームA） ▼
+    let currentRoom = 'roomA';
+    let dbRef = ref(db, `ow_match/${currentRoom}`);
+    let currentUnsubscribe = null;
 
     const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHb34RcBctjEcBeNrixnFu_sfbF7B2sAjFkWVIHcqKcLhmurraDyS2thmJbGTlrF3WNUom2go4P66X/pub?output=csv";
     
@@ -280,8 +290,6 @@
     let heroesMap = {};
     let winrateData = {}; 
     let isSyncing = false; 
-
-    // ▼ ローカル（自分だけ）で消したULT通知の時間を記録しておくオブジェクト
     let localUltDismissed = {}; 
 
     async function loadWinrateData() {
@@ -421,9 +429,6 @@
         panel.style.display = 'block';
     }
 
-    // ==========================================
-    // 新機能: ULT通知ウィンドウの描画と管理
-    // ==========================================
     function renderUltAlerts() {
         const now = Date.now();
         const container = document.getElementById('ult-alerts-container');
@@ -433,21 +438,18 @@
             const alertTime = appState.ultAlerts[slotId];
             const existingAlert = document.getElementById(`ult-alert-${slotId}`);
             
-            // Firebase上の時間が15秒以内で、かつローカルでまだ消していない場合
             if (alertTime && (now - alertTime < 15000) && localUltDismissed[slotId] !== alertTime) {
                 if (!existingAlert) {
                     const heroId = appState.enemies[slotId];
                     const heroData = heroesMap[heroId];
                     const heroName = heroData ? heroData.name : '敵';
                     
-                    // 画像がない時の代わりのアイコン
                     let imgHtml = heroId ? `<img src="images01/${heroId}.png" class="ult-alert-img" onerror="this.style.display='none'">` : `<div class="ult-alert-img" style="display:flex; align-items:center; justify-content:center;">?</div>`;
                     
                     const div = document.createElement('div');
                     div.className = 'ult-alert-box';
                     div.id = `ult-alert-${slotId}`;
                     
-                    // アニメーションを途中から始めるための計算（他の人が遅れて開いた時用）
                     const elapsedSec = (now - alertTime) / 1000;
                     
                     div.innerHTML = `
@@ -459,7 +461,6 @@
                     container.appendChild(div);
                 }
             } else {
-                // 時間切れ、またはローカルで消された場合はHTMLから削除
                 if (existingAlert) {
                     existingAlert.remove();
                 }
@@ -467,7 +468,6 @@
         });
     }
 
-    // 手動で×ボタンを押した時の処理（ローカルのみに反映）
     window.dismissUltAlert = function(slotId, alertTime) {
         localUltDismissed[slotId] = alertTime;
         renderUltAlerts(); 
@@ -477,10 +477,9 @@
         event.stopPropagation(); 
         appState.ultAlerts[slotId] = Date.now(); 
         pushDataToFirebase();
-        renderUltAlerts(); // 押したらすぐローカルに表示
+        renderUltAlerts(); 
     };
 
-    // 自動消滅用のループ処理
     setInterval(() => {
         renderUltAlerts();
     }, 1000);
@@ -516,29 +515,60 @@
         }
     }
 
-    // ==========================================
-    // Firebase 受信ロジック
-    // ==========================================
-    function startFirebaseSync() {
-        onValue(dbRef, (snapshot) => {
-            const data = snapshot.val();
-            if (!data) return;
+    // ▼ 新機能：ルームを切り替える関数 ▼
+    window.toggleRoom = function() {
+        const btn = document.getElementById('room-toggle-btn');
+        if (currentRoom === 'roomA') {
+            currentRoom = 'roomB';
+            btn.innerText = '🚪 ルームB';
+            btn.classList.add('room-b');
+        } else {
+            currentRoom = 'roomA';
+            btn.innerText = '🚪 ルームA';
+            btn.classList.remove('room-b');
+        }
+        
+        dbRef = ref(db, `ow_match/${currentRoom}`);
+        isSyncing = true;
+        localUltDismissed = {}; // ルーム変更時にローカルの×ボタン履歴をリセット
+        
+        const ultContainer = document.getElementById('ult-alerts-container');
+        if(ultContainer) ultContainer.innerHTML = '';
+        
+        startFirebaseSync();
+    };
 
+    function startFirebaseSync() {
+        if (currentUnsubscribe) currentUnsubscribe(); // 前のルームの同期をキャンセル
+        
+        currentUnsubscribe = onValue(dbRef, (snapshot) => {
+            const data = snapshot.val();
+            
             isSyncing = true; 
 
-            if (data.enemies) appState.enemies = data.enemies;
-            if (data.allies) appState.allies = data.allies;
-            if (data.ultAlerts) {
-                appState.ultAlerts = data.ultAlerts;
-                renderUltAlerts(); // 通知を受信したら即座にUIへ反映
-            }
+            if (!data) {
+                // ルームに誰もいない（空の）場合は初期状態にする
+                appState.enemies = { 'enemy-tank': '', 'enemy-dps1': '', 'enemy-dps2': '', 'enemy-sup1': '', 'enemy-sup2': '' };
+                appState.allies = { 'ally-tank': '', 'ally-dps1': '', 'ally-dps2': '', 'ally-sup1': '', 'ally-sup2': '' };
+                appState.ultAlerts = {};
+                document.getElementById("match-rule").value = "";
+                updateMapOptions();
+                document.getElementById("match-map").value = "";
+            } else {
+                if (data.enemies) appState.enemies = data.enemies;
+                if (data.allies) appState.allies = data.allies;
+                if (data.ultAlerts) {
+                    appState.ultAlerts = data.ultAlerts;
+                    renderUltAlerts(); 
+                }
 
-            if (data.rule !== undefined) {
-                document.getElementById("match-rule").value = data.rule;
-                updateMapOptions(); 
-            }
-            if (data.map !== undefined) {
-                document.getElementById("match-map").value = data.map;
+                if (data.rule !== undefined) {
+                    document.getElementById("match-rule").value = data.rule;
+                    updateMapOptions(); 
+                }
+                if (data.map !== undefined) {
+                    document.getElementById("match-map").value = data.map;
+                }
             }
 
             ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2', 'ally-tank','ally-dps1','ally-dps2','ally-sup1','ally-sup2'].forEach(slotId => {
@@ -554,17 +584,16 @@
                     imgBox.innerHTML = slotId.includes('tank') ? 'T' : slotId.includes('dps') ? 'D' : 'S'; 
                     nameBox.innerText = "未選択"; 
                 }
+                
+                const wrapper = document.getElementById(`wrap-${slotId}`);
+                if (wrapper) wrapper.classList.remove('is-ult-alert');
             });
 
             updateSimulation(); 
-
             setTimeout(() => { isSyncing = false; }, 50);
         });
     }
 
-    // ==========================================
-    // Firebase 送信ロジック
-    // ==========================================
     function pushDataToFirebase() {
         if (isSyncing) return; 
         set(dbRef, {
@@ -575,10 +604,6 @@
             ultAlerts: appState.ultAlerts 
         });
     }
-
-    // ==========================================
-    // 既存のツールロジック
-    // ==========================================
 
     function resetAll() {
         if(!confirm("編成と環境をすべてリセットしますか？")) return;
@@ -616,7 +641,7 @@
     const mapDatabase = {
         "コントロール": [{ id: "ilios", name: "Ilios" }, { id: "lijiang_tower", name: "Lijiang" }, { id: "nepal", name: "Nepal" }, { id: "oasis", name: "Oasis" }, { id: "busan", name: "Busan" }, { id: "antarctic_peninsula", name: "Antarctic" }, { id: "samoa", name: "Samoa" }],
         "エスコート": [{ id: "circuit_royal", name: "Circuit Royal", hasSide: true }, { id: "dorado", name: "Dorado", hasSide: true }, { id: "havana", name: "Havana", hasSide: true }, { id: "junkertown", name: "Junkertown", hasSide: true }, { id: "rialto", name: "Rialto", hasSide: true }, { id: "route_66", name: "Route 66", hasSide: true }, { id: "shambali", name: "Shambali", hasSide: true }, { id: "gibraltar", name: "Gibraltar", hasSide: true }],
-        "ハイブリッド": [{ id: "blizzard_world", name: "Blizzard World", hasSide: true }, { id: "eichenwalde", name: "Eichenwalde", hasSide: true }, { id: "hollywood", name: "Hollywood", hasSide: true }, { id: "king's_row", name: "King's Row", hasSide: true }, { id: "midtown", name: "Midtown", hasSide: true }, { id: "numbani", name: "Numbani", hasSide: true }, { id: "paraiso", name: "Paraíso", hasSide: true }],
+        "ハイブリッド": [{ id: "blizzard_world", name: "Blizzard World", hasSide: true }, { id: "eichenwalde", name: "Eichenwalde", hasSide: true }, { id: "hollywood", name: "Hollywood", hasSide: true }, { id: "kings_row", name: "King's Row", hasSide: true }, { id: "midtown", name: "Midtown", hasSide: true }, { id: "numbani", name: "Numbani", hasSide: true }, { id: "paraiso", name: "Paraíso", hasSide: true }],
         "プッシュ": [{ id: "colosseo", name: "Colosseo" }, { id: "esperanca", name: "Esperança" }, { id: "new_queen_street", name: "New Queen St" }, { id: "runasapi", name: "Runasapi" }],
         "フラッシュポイント": [{ id: "new_junk_city", name: "New Junk City" }, { id: "suravasa", name: "Suravasa" }],
         "クラッシュ": [{ id: "hanaoka", name: "Hanaoka" }, { id: "throne_of_anubis", name: "Anubis" }]

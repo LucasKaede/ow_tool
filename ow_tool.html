@@ -74,7 +74,6 @@
         .details-total-score { font-size: 1rem; font-weight: bold; padding: 2px 8px; border-radius: 4px; border: none; box-shadow: none; }
         .details-content { display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; line-height: 1.4; color: var(--text-sub); }
         
-        /* 評価用タグの色分け */
         .tag-env { color: #c084fc; } 
         .tag-env-bad { color: #f43f5e; } 
         .tag-anti { color: #34d399; font-weight: bold; } 
@@ -97,6 +96,19 @@
         .modal-item-info { width: 100%; font-weight: bold; font-size: 0.65rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
         .modal-item .score-badge { position: absolute; top: -8px; right: -6px; font-size: 0.7rem; }
         .clear-btn { grid-column: 1 / -1; flex-direction: row; justify-content: center; background-color: #3f2c33; color: #f43f5e; font-weight: bold; padding: 14px; margin-bottom: 5px; }
+
+        /* ターゲット用バッジとULTボタンのCSS */
+        .target-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; font-weight: bold; z-index: 10; display: none; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.5); background-color: #991b1b; color: #fca5a5; border: 1px solid #f87171; }
+        
+        .ult-btn { background-color: #64748b; color: #fff; border: none; border-radius: 4px; padding: 4px 0; font-size: 0.6rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 4px; transition: 0.1s; }
+        .ult-btn:active { transform: scale(0.9); }
+        
+        @keyframes ultFlash {
+            0% { box-shadow: 0 0 0px #f43f5e; border-color: transparent; background-color: var(--panel-bg); }
+            50% { box-shadow: 0 0 15px #f43f5e; border-color: #f43f5e; background-color: #4c1d2e; }
+            100% { box-shadow: 0 0 0px #f43f5e; border-color: transparent; background-color: var(--panel-bg); }
+        }
+        .is-ult-alert { animation: ultFlash 0.6s infinite; }
     </style>
 </head>
 <body>
@@ -114,7 +126,7 @@
         <div class="section-title standalone-title title-env">マップ ＆ ルール</div>
         <div class="env-row">
             <div class="env-select-wrap">
-                <select id="match-rule" onchange="updateMapOptions(); updateSimulation();">
+                <select id="match-rule" onchange="updateMapOptions(); updateSimulation(); pushDataToFirebase();">
                     <option value="">ルール選択...</option>
                     <option value="コントロール">コントロール 🚩</option>
                     <option value="エスコート">エスコート 🚚</option>
@@ -125,7 +137,7 @@
                 </select>
             </div>
             <div class="env-select-wrap">
-                <select id="match-map" onchange="updateSimulation()">
+                <select id="match-map" onchange="updateSimulation(); pushDataToFirebase();">
                     <option value="">マップ選択...</option>
                 </select>
             </div>
@@ -152,11 +164,11 @@
             <div id="enemy-team-score" class="score-badge team-score-badge">0.0</div>
         </div>
         <div class="team-row">
-            <div class="slot-wrapper slot-tank" id="wrap-enemy-tank" onclick="selectFrame('enemy-tank')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-tank', 'tank')"><div class="slot-empty-icon" id="img-enemy-tank">T</div></div><div class="slot-name" id="name-enemy-tank">未選択</div><div class="suggest-box" id="suggest-enemy-tank"></div><div id="score-enemy-tank" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps1" onclick="selectFrame('enemy-dps1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps1', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps1">D</div></div><div class="slot-name" id="name-enemy-dps1">未選択</div><div class="suggest-box" id="suggest-enemy-dps1"></div><div id="score-enemy-dps1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps2" onclick="selectFrame('enemy-dps2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps2', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps2">D</div></div><div class="slot-name" id="name-enemy-dps2">未選択</div><div class="suggest-box" id="suggest-enemy-dps2"></div><div id="score-enemy-dps2" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-enemy-sup1" onclick="selectFrame('enemy-sup1')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup1', 'support')"><div class="slot-empty-icon" id="img-enemy-sup1">S</div></div><div class="slot-name" id="name-enemy-sup1">未選択</div><div class="suggest-box" id="suggest-enemy-sup1"></div><div id="score-enemy-sup1" class="score-badge slot-score"></div></div>
-            <div class="slot-wrapper slot-support" id="wrap-enemy-sup2" onclick="selectFrame('enemy-sup2')"><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup2', 'support')"><div class="slot-empty-icon" id="img-enemy-sup2">S</div></div><div class="slot-name" id="name-enemy-sup2">未選択</div><div class="suggest-box" id="suggest-enemy-sup2"></div><div id="score-enemy-sup2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-tank" id="wrap-enemy-tank" onclick="selectFrame('enemy-tank')"><div id="target-enemy-tank" class="target-badge"></div><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-tank', 'tank')"><div class="slot-empty-icon" id="img-enemy-tank">T</div></div><div class="slot-name" id="name-enemy-tank">未選択</div><button class="ult-btn" onclick="triggerUlt(event, 'enemy-tank')">ULT注意</button><div class="suggest-box" id="suggest-enemy-tank"></div><div id="score-enemy-tank" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps1" onclick="selectFrame('enemy-dps1')"><div id="target-enemy-dps1" class="target-badge"></div><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps1', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps1">D</div></div><div class="slot-name" id="name-enemy-dps1">未選択</div><button class="ult-btn" onclick="triggerUlt(event, 'enemy-dps1')">ULT注意</button><div class="suggest-box" id="suggest-enemy-dps1"></div><div id="score-enemy-dps1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-dps" id="wrap-enemy-dps2" onclick="selectFrame('enemy-dps2')"><div id="target-enemy-dps2" class="target-badge"></div><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-dps2', 'dps')"><div class="slot-empty-icon" id="img-enemy-dps2">D</div></div><div class="slot-name" id="name-enemy-dps2">未選択</div><button class="ult-btn" onclick="triggerUlt(event, 'enemy-dps2')">ULT注意</button><div class="suggest-box" id="suggest-enemy-dps2"></div><div id="score-enemy-dps2" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-enemy-sup1" onclick="selectFrame('enemy-sup1')"><div id="target-enemy-sup1" class="target-badge"></div><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup1', 'support')"><div class="slot-empty-icon" id="img-enemy-sup1">S</div></div><div class="slot-name" id="name-enemy-sup1">未選択</div><button class="ult-btn" onclick="triggerUlt(event, 'enemy-sup1')">ULT注意</button><div class="suggest-box" id="suggest-enemy-sup1"></div><div id="score-enemy-sup1" class="score-badge slot-score"></div></div>
+            <div class="slot-wrapper slot-support" id="wrap-enemy-sup2" onclick="selectFrame('enemy-sup2')"><div id="target-enemy-sup2" class="target-badge"></div><div class="slot-image-box" onclick="handleImageTap(event, 'enemy-sup2', 'support')"><div class="slot-empty-icon" id="img-enemy-sup2">S</div></div><div class="slot-name" id="name-enemy-sup2">未選択</div><button class="ult-btn" onclick="triggerUlt(event, 'enemy-sup2')">ULT注意</button><div class="suggest-box" id="suggest-enemy-sup2"></div><div id="score-enemy-sup2" class="score-badge slot-score"></div></div>
         </div>
         <div style="font-size:0.65rem; color:var(--text-sub); text-align:right; margin-top:5px;">※アイコン下：狩れるアンチピック（Tank1, DPS2）</div>
     </div>
@@ -187,6 +199,7 @@
         <div class="modal-list" id="modal-list"></div>
     </div>
 </div>
+
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -212,7 +225,8 @@
         allies: { 'ally-tank': '', 'ally-dps1': '', 'ally-dps2': '', 'ally-sup1': '', 'ally-sup2': '' },
         focusedSlot: null, 
         allyResults: {}, 
-        enemyResults: {}
+        enemyResults: {},
+        ultAlerts: {} 
     };
 
     let heroesDatabase = [];
@@ -220,7 +234,61 @@
     let isSyncing = false; 
 
     // ==========================================
-    // Firebase 受信ロジック（関数化して待機させる）
+    // ULT注意と要警戒ターゲット算出
+    // ==========================================
+    window.triggerUlt = function(event, slotId) {
+        event.stopPropagation(); 
+        appState.ultAlerts[slotId] = Date.now(); 
+        pushDataToFirebase();
+    };
+
+    setInterval(() => {
+        const now = Date.now();
+        ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2'].forEach(slotId => {
+            const wrapper = document.getElementById(`wrap-${slotId}`);
+            if (!wrapper) return;
+            
+            if (appState.ultAlerts[slotId] && (now - appState.ultAlerts[slotId]) < 15000) {
+                wrapper.classList.add('is-ult-alert');
+            } else {
+                wrapper.classList.remove('is-ult-alert');
+            }
+        });
+    }, 1000);
+
+    function updateDangerTarget() {
+        ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2'].forEach(slotId => {
+            const badge = document.getElementById(`target-${slotId}`);
+            if (badge) badge.style.display = 'none';
+        });
+
+        const activeEnemies = Object.keys(appState.enemies).filter(k => appState.enemies[k] !== "");
+        if (activeEnemies.length === 0) return;
+
+        let maxScore = -999; let dangerSlot = null;
+
+        activeEnemies.forEach(slotId => {
+            const heroId = appState.enemies[slotId];
+            if (!heroId) return;
+            const heroData = heroesMap[heroId];
+            
+            if (heroData.role === 'support') return; 
+
+            if (!appState.enemyResults[heroId]) return;
+            const score = appState.enemyResults[heroId].score;
+
+            if (score > maxScore) { maxScore = score; dangerSlot = slotId; }
+        });
+
+        if (dangerSlot && maxScore > 0) {
+            const badge = document.getElementById(`target-${dangerSlot}`);
+            badge.innerText = "⚠️ 要警戒"; badge.style.display = "block";
+        }
+    }
+
+
+    // ==========================================
+    // Firebase 受信ロジック
     // ==========================================
     function startFirebaseSync() {
         onValue(dbRef, (snapshot) => {
@@ -231,6 +299,7 @@
 
             if (data.enemies) appState.enemies = data.enemies;
             if (data.allies) appState.allies = data.allies;
+            if (data.ultAlerts) appState.ultAlerts = data.ultAlerts; 
 
             if (data.rule !== undefined) {
                 document.getElementById("match-rule").value = data.rule;
@@ -261,14 +330,17 @@
         });
     }
 
-    // 【送信】手元の操作をクラウドに送信
+    // ==========================================
+    // Firebase 送信ロジック
+    // ==========================================
     function pushDataToFirebase() {
         if (isSyncing) return; 
         set(dbRef, {
             rule: document.getElementById("match-rule").value,
             map: document.getElementById("match-map").value,
             enemies: appState.enemies,
-            allies: appState.allies
+            allies: appState.allies,
+            ultAlerts: appState.ultAlerts 
         });
     }
 
@@ -281,6 +353,7 @@
         
         appState.enemies = { 'enemy-tank': '', 'enemy-dps1': '', 'enemy-dps2': '', 'enemy-sup1': '', 'enemy-sup2': '' };
         appState.allies = { 'ally-tank': '', 'ally-dps1': '', 'ally-dps2': '', 'ally-sup1': '', 'ally-sup2': '' };
+        appState.ultAlerts = {};
         appState.focusedSlot = null;
         
         document.getElementById("match-rule").value = "";
@@ -293,6 +366,7 @@
             document.getElementById(`name-${slotId}`).innerText = "未選択";
             document.getElementById(`score-${slotId}`).classList.remove('is-visible');
             document.getElementById(`wrap-${slotId}`).classList.remove('is-selected');
+            document.getElementById(`wrap-${slotId}`).classList.remove('is-ult-alert');
             
             const sug = document.getElementById(`suggest-${slotId}`);
             if (sug) sug.innerHTML = "";
@@ -392,10 +466,7 @@
 
             document.getElementById("load-status").innerText = `✓ データ読込完了（${heroesDatabase.length}体）`;
             updateMapOptions(); 
-            
-            // ★【ここがポイント】キャラデータの読み込みが完了してからFirebaseの同期を開始する
             startFirebaseSync();
-            
             updateSimulation();
         } catch (error) { document.getElementById("load-status").innerText = "エラー: データの読み込みに失敗しました。"; }
     }
@@ -545,6 +616,7 @@
             updateSuggests(); 
             calculateOptimalTeam();
             renderDetailsPanel();
+            updateDangerTarget(); 
         }, 10);
     }
 

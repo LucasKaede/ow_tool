@@ -22,12 +22,13 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 0; padding-bottom: 40px; }
         
-        header { padding: 15px 10px; background-color: var(--panel-bg); box-shadow: 0 2px 8px rgba(0,0,0,0.5); position: sticky; top: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        /* ▼ ヘッダーの高さを削減（paddingやfont-sizeを縮小） ▼ */
+        header { padding: 8px 10px; background-color: var(--panel-bg); box-shadow: 0 2px 8px rgba(0,0,0,0.5); position: sticky; top: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-top { display: flex; justify-content: center; align-items: center; width: 100%; position: relative; }
-        h1 { font-size: 1.2rem; margin: 0; }
-        .reset-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background-color: var(--panel-sub); color: #fff; border: none; padding: 6px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        h1 { font-size: 1.1rem; margin: 0; }
+        .reset-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background-color: var(--panel-sub); color: #fff; border: none; padding: 5px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .reset-btn:active { transform: translateY(-50%) scale(0.9); }
-        #load-status { font-size: 0.75rem; color: var(--text-sub); margin-top: 5px; }
+        #load-status { font-size: 0.7rem; color: var(--text-sub); margin-top: 3px; }
 
         .container { padding: 15px; display: flex; flex-direction: column; gap: 20px; }
         .team-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -42,7 +43,9 @@
         .env-select-wrap { flex: 1; background-color: var(--panel-bg); border-radius: 8px; border: 1px solid var(--panel-sub); overflow: hidden; }
         .env-select-wrap select { width: 100%; background: transparent; color: #fff; border: none; padding: 12px; font-size: 0.9rem; outline: none; appearance: none; cursor: pointer; }
 
-        .team-row { display: flex; justify-content: space-between; gap: 6px; }
+        /* ▼ 枠の下にバッジ用の余白（margin-bottom）を追加 ▼ */
+        .team-row { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 24px; }
+        
         .slot-wrapper { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; background-color: var(--panel-bg); border-radius: 8px; padding: 6px 4px; border: 2px solid transparent; transition: 0.2s; position: relative; }
         .slot-wrapper.is-selected { border-color: var(--accent-ally); background-color: #2a3b5c; }
         .slot-image-box { width: 100%; aspect-ratio: 1/1; background-color: var(--panel-sub); border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; cursor: pointer; }
@@ -97,8 +100,8 @@
         .modal-item .score-badge { position: absolute; top: -8px; right: -6px; font-size: 0.7rem; }
         .clear-btn { grid-column: 1 / -1; flex-direction: row; justify-content: center; background-color: #3f2c33; color: #f43f5e; font-weight: bold; padding: 14px; margin-bottom: 5px; }
 
-        /* ターゲット用バッジとULTボタンのCSS */
-        .target-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; font-weight: bold; z-index: 10; display: none; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.5); background-color: #991b1b; color: #fca5a5; border: 1px solid #f87171; }
+        /* ▼ ターゲットバッジを上部（top）から下部（bottom）に変更 ▼ */
+        .target-badge { position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; font-weight: bold; z-index: 10; display: none; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.5); background-color: #991b1b; color: #fca5a5; border: 1px solid #f87171; }
         
         .ult-btn { background-color: #64748b; color: #fff; border: none; border-radius: 4px; padding: 4px 0; font-size: 0.6rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 4px; transition: 0.1s; }
         .ult-btn:active { transform: scale(0.9); }
@@ -272,6 +275,7 @@
             if (!heroId) return;
             const heroData = heroesMap[heroId];
             
+            // サポートは要警戒ターゲットから除外
             if (heroData.role === 'support') return; 
 
             if (!appState.enemyResults[heroId]) return;

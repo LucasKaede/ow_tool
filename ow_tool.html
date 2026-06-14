@@ -42,7 +42,6 @@
         .env-select-wrap { flex: 1; background-color: var(--panel-bg); border-radius: 8px; border: 1px solid var(--panel-sub); overflow: hidden; }
         .env-select-wrap select { width: 100%; background: transparent; color: #fff; border: none; padding: 12px; font-size: 0.9rem; outline: none; appearance: none; cursor: pointer; }
 
-        /* ▼ ロール別勝率Top3パネルのCSS ▼ */
         .winrate-panel { background-color: var(--panel-bg); border-radius: 8px; padding: 10px; margin-top: -10px; border: 1px solid var(--panel-sub); display: none; }
         .winrate-list { display: flex; gap: 6px; margin-top: 8px; justify-content: space-between; }
         .winrate-role-col { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
@@ -114,13 +113,19 @@
         
         .ult-btn { background-color: #64748b; color: #fff; border: none; border-radius: 4px; padding: 4px 0; font-size: 0.6rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 4px; transition: 0.1s; }
         .ult-btn:active { transform: scale(0.9); }
+
+        /* ▼▼▼ 新機能：ULT注意通知ウィンドウのCSS ▼▼▼ */
+        #ult-alerts-container { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .ult-alert-box { background-color: rgba(127, 29, 29, 0.95); border: 2px solid #ef4444; border-bottom: none; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.8); display: flex; align-items: center; padding: 8px 12px; gap: 12px; position: relative; overflow: hidden; pointer-events: auto; color: #fff; animation: slideDown 0.3s ease-out; }
+        .ult-alert-img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 2px solid #fca5a5; background-color: #000; flex-shrink: 0; }
+        .ult-alert-text { flex: 1; font-weight: bold; font-size: 0.95rem; text-shadow: 1px 1px 2px #000; }
+        .ult-alert-close { background: none; border: none; color: #fff; font-size: 1.8rem; cursor: pointer; padding: 0 5px; opacity: 0.7; transition: 0.2s; line-height: 1; }
+        .ult-alert-close:active { opacity: 1; transform: scale(0.9); }
+        .ult-alert-gauge { position: absolute; bottom: 0; left: 0; height: 5px; background-color: #fbbf24; width: 100%; transform-origin: left; animation: shrinkGauge 15s linear forwards; }
         
-        @keyframes ultFlash {
-            0% { box-shadow: 0 0 0px #f43f5e; border-color: transparent; background-color: var(--panel-bg); }
-            50% { box-shadow: 0 0 15px #f43f5e; border-color: #f43f5e; background-color: #4c1d2e; }
-            100% { box-shadow: 0 0 0px #f43f5e; border-color: transparent; background-color: var(--panel-bg); }
-        }
-        .is-ult-alert { animation: ultFlash 0.6s infinite; }
+        @keyframes shrinkGauge { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        /* ▲▲▲ 新機能ここまで ▲▲▲ */
     </style>
 </head>
 <body>
@@ -132,6 +137,8 @@
     </div>
     <div id="load-status">データを読み込み中...</div>
 </header>
+
+<div id="ult-alerts-container"></div>
 
 <div class="container">
     <div>
@@ -237,14 +244,12 @@
 
     const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHb34RcBctjEcBeNrixnFu_sfbF7B2sAjFkWVIHcqKcLhmurraDyS2thmJbGTlrF3WNUom2go4P66X/pub?output=csv";
     
-    // 3つの勝率シートのURL
     const WINRATE_CSV_URLS = [
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1386442422", // Tank
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=2145672425", // DPS
         "https://docs.google.com/spreadsheets/d/13sgqhmsuSeCgO5qofosgkUpdMhCJ8kGv5c5WdaDYYak/export?format=csv&gid=1735556932"  // Support
     ];
 
-    // ▼ 表記揺れを吸収する超・堅牢な翻訳辞書
     const ALIAS_MAP = {
         "antarctica": "antarctic_peninsula",
         "lijiang": "lijiang_tower",
@@ -259,7 +264,6 @@
     function normalizeName(name) {
         let n = name.toLowerCase().trim();
         n = ALIAS_MAP[n] || n;
-        // 空白や記号をアンダーバーに統一して完全に一致させる
         return n.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_'); 
     }
 
@@ -277,9 +281,9 @@
     let winrateData = {}; 
     let isSyncing = false; 
 
-    // ==========================================
-    // マップ別 勝率データの読み込み（強引突破のファジー解析版）
-    // ==========================================
+    // ▼ ローカル（自分だけ）で消したULT通知の時間を記録しておくオブジェクト
+    let localUltDismissed = {}; 
+
     async function loadWinrateData() {
         winrateData = {}; 
         
@@ -290,23 +294,19 @@
                 const csvText = await response.text();
                 if (csvText.trim().startsWith("<!DOCTYPE html>")) continue;
 
-                // 改行コードの揺れを統一
                 const lines = csvText.replace(/\r\n/g, "\n").split("\n").map(l => l.trim()).filter(l => l !== "");
                 if (lines.length < 2) continue;
 
-                // 1行目のヘッダーから、マップが存在する列番号（インデックス）を特定する
                 const headers = parseCSVLine(lines[0]);
                 const mapCols = {};
                 for(let j=0; j<headers.length; j++) {
                     if(!headers[j]) continue;
                     let hLow = headers[j].toLowerCase();
-                    // ヘッダー名がHeroやWinrateっぽい列は無視
                     if(hLow.includes("hero") || hLow.includes("win")) continue;
                     let mapKey = normalizeName(headers[j]);
                     if(mapKey) mapCols[j] = mapKey;
                 }
 
-                // データ行のパース
                 for (let i = 1; i < lines.length; i++) {
                     const cols = parseCSVLine(lines[i]);
                     if (cols.length < 3) continue;
@@ -315,15 +315,12 @@
                     let baseRate = 50.0;
                     let heroNameCol = -1;
 
-                    // 最初の3列くらいの中から「キャラ名」と「基本勝率」を探し出す（強引ファジー処理）
                     for(let c=0; c<=2; c++) {
                         if(!cols[c]) continue;
                         if(cols[c].includes('%')) {
                             let val = parseFloat(cols[c].replace(/[^0-9.-]/g, ''));
-                            // 30〜70%の数字なら「基本勝率」とみなす（増減値の数パーセントと区別する）
                             if(!isNaN(val) && val > 30 && val < 70) baseRate = val;
                         } else if(cols[c].match(/[a-zA-Z]/)) { 
-                            // アルファベットが含まれていれば「キャラ名」とみなす
                             heroRaw = cols[c];
                             heroNameCol = c;
                         }
@@ -331,7 +328,6 @@
 
                     if (!heroRaw) continue;
 
-                    // キャラ名からデータベースと照合
                     let heroObj = heroesDatabase.find(h => h.name.toLowerCase() === heroRaw.toLowerCase() || h.id === heroRaw.toLowerCase());
                     if(!heroObj) {
                         heroObj = heroesDatabase.find(h => h.name.toLowerCase().includes(heroRaw.toLowerCase()));
@@ -342,7 +338,6 @@
                     let displayName = heroObj.name;
                     let heroRole = heroObj.role;
 
-                    // マップごとの列データを処理
                     for (let j in mapCols) {
                         if (j == heroNameCol || !cols[j]) continue;
                         let mapKey = mapCols[j];
@@ -352,7 +347,6 @@
                         let diffVal = parseFloat(diffStr);
                         
                         if (!isNaN(diffVal)) {
-                            // 相対増減値(diff)と、基本勝率(base)の両方を保存
                             winrateData[mapKey].push({ heroId: heroId, name: displayName, diff: diffVal, base: baseRate, role: heroRole });
                         }
                     }
@@ -362,7 +356,6 @@
             }
         }
 
-        // 最後に「差分が大きい順（相対的に強い順）」にソート
         for (let k in winrateData) {
             winrateData[k].sort((a, b) => b.diff - a.diff);
         }
@@ -381,8 +374,6 @@
         let mapDisplayName = mapSelect.options[mapSelect.selectedIndex].text.replace(/ ⚔\(攻\)| 🛡\(防\)/g, '');
 
         let searchKey = normalizeName(currentMapBase);
-        
-        // 正規化されたキーから、完全一致または部分一致でデータを探す
         let matchedKey = Object.keys(winrateData).find(k => k === searchKey || k.includes(searchKey) || searchKey.includes(k));
 
         if (!matchedKey || winrateData[matchedKey].length === 0) {
@@ -392,7 +383,6 @@
             return;
         }
 
-        // ロールごとにTop3を抽出
         const tanks = winrateData[matchedKey].filter(i => i.role === 'tank').slice(0, 3);
         const dps = winrateData[matchedKey].filter(i => i.role === 'dps').slice(0, 3);
         const sups = winrateData[matchedKey].filter(i => i.role === 'support').slice(0, 3);
@@ -413,7 +403,6 @@
                 let prefix = item.diff > 0 ? '+' : '';
                 let finalRate = (item.base + item.diff).toFixed(1);
                 
-                // 変動値と基本勝率を横・縦に整列させるリッチな表示
                 html += `
                 <div class="winrate-item">
                     ${imgHtml}
@@ -433,27 +422,69 @@
     }
 
     // ==========================================
-    // ULT注意と要警戒ターゲット算出
+    // 新機能: ULT通知ウィンドウの描画と管理
     // ==========================================
+    function renderUltAlerts() {
+        const now = Date.now();
+        const container = document.getElementById('ult-alerts-container');
+        if (!container) return;
+        
+        ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2'].forEach(slotId => {
+            const alertTime = appState.ultAlerts[slotId];
+            const existingAlert = document.getElementById(`ult-alert-${slotId}`);
+            
+            // Firebase上の時間が15秒以内で、かつローカルでまだ消していない場合
+            if (alertTime && (now - alertTime < 15000) && localUltDismissed[slotId] !== alertTime) {
+                if (!existingAlert) {
+                    const heroId = appState.enemies[slotId];
+                    const heroData = heroesMap[heroId];
+                    const heroName = heroData ? heroData.name : '敵';
+                    
+                    // 画像がない時の代わりのアイコン
+                    let imgHtml = heroId ? `<img src="images01/${heroId}.png" class="ult-alert-img" onerror="this.style.display='none'">` : `<div class="ult-alert-img" style="display:flex; align-items:center; justify-content:center;">?</div>`;
+                    
+                    const div = document.createElement('div');
+                    div.className = 'ult-alert-box';
+                    div.id = `ult-alert-${slotId}`;
+                    
+                    // アニメーションを途中から始めるための計算（他の人が遅れて開いた時用）
+                    const elapsedSec = (now - alertTime) / 1000;
+                    
+                    div.innerHTML = `
+                        ${imgHtml}
+                        <div class="ult-alert-text">⚠️ ${heroName}のULT注意！</div>
+                        <button class="ult-alert-close" onclick="dismissUltAlert('${slotId}', ${alertTime})">&times;</button>
+                        <div class="ult-alert-gauge" style="animation-delay: -${elapsedSec}s"></div>
+                    `;
+                    container.appendChild(div);
+                }
+            } else {
+                // 時間切れ、またはローカルで消された場合はHTMLから削除
+                if (existingAlert) {
+                    existingAlert.remove();
+                }
+            }
+        });
+    }
+
+    // 手動で×ボタンを押した時の処理（ローカルのみに反映）
+    window.dismissUltAlert = function(slotId, alertTime) {
+        localUltDismissed[slotId] = alertTime;
+        renderUltAlerts(); 
+    };
+
     window.triggerUlt = function(event, slotId) {
         event.stopPropagation(); 
         appState.ultAlerts[slotId] = Date.now(); 
         pushDataToFirebase();
+        renderUltAlerts(); // 押したらすぐローカルに表示
     };
 
+    // 自動消滅用のループ処理
     setInterval(() => {
-        const now = Date.now();
-        ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2'].forEach(slotId => {
-            const wrapper = document.getElementById(`wrap-${slotId}`);
-            if (!wrapper) return;
-            
-            if (appState.ultAlerts[slotId] && (now - appState.ultAlerts[slotId]) < 15000) {
-                wrapper.classList.add('is-ult-alert');
-            } else {
-                wrapper.classList.remove('is-ult-alert');
-            }
-        });
+        renderUltAlerts();
     }, 1000);
+
 
     function updateDangerTarget() {
         ['enemy-tank','enemy-dps1','enemy-dps2','enemy-sup1','enemy-sup2'].forEach(slotId => {
@@ -497,7 +528,10 @@
 
             if (data.enemies) appState.enemies = data.enemies;
             if (data.allies) appState.allies = data.allies;
-            if (data.ultAlerts) appState.ultAlerts = data.ultAlerts; 
+            if (data.ultAlerts) {
+                appState.ultAlerts = data.ultAlerts;
+                renderUltAlerts(); // 通知を受信したら即座にUIへ反映
+            }
 
             if (data.rule !== undefined) {
                 document.getElementById("match-rule").value = data.rule;
@@ -564,7 +598,6 @@
             document.getElementById(`name-${slotId}`).innerText = "未選択";
             document.getElementById(`score-${slotId}`).classList.remove('is-visible');
             document.getElementById(`wrap-${slotId}`).classList.remove('is-selected');
-            document.getElementById(`wrap-${slotId}`).classList.remove('is-ult-alert');
             
             const sug = document.getElementById(`suggest-${slotId}`);
             if (sug) sug.innerHTML = "";
@@ -686,7 +719,7 @@
             score -= 1.5; details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc} (-1.5)</span>`);
         } else if (currentRule && mapSide && hero.badMapRuleTargets.includes(currentRule + "_" + mapSide)) {
             score -= 1.0; details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc} (-1.0)</span>`);
-        } else if (currentRule && hero.badMapRuleTargets.includes(currentRule)) {
+        } else if (currentRule && hero.mapRuleTargets.includes(currentRule)) {
             score -= 1.0; details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc} (-1.0)</span>`);
         } else if (mapSide && hero.badMapRuleTargets.includes(mapSide)) {
             score -= 0.5; details.push(`<span class="tag-env-bad">【環境不利】${hero.badMapRuleDesc} (-0.5)</span>`);
@@ -1115,7 +1148,6 @@
     window.selectHero = selectHero;
     window.closeModal = closeModal;
 
-    // ▼ 非同期の順番を厳密に制御して「リロードで消えるバグ」を完全解消 ▼
     window.onload = async () => {
         const statusEl = document.getElementById("load-status");
         
